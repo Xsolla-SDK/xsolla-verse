@@ -43,6 +43,8 @@ const {
   CS_XSOLLA_DEPOSIT,
   CS_XSOLLA_WITHDRAW,
   SC_XSOLLA_BANKROLL,
+  CS_ECONOMY_SYNC,
+  SC_FEE_POOL,
 } = require('../game/actions');
 const config = require('../config');
 
@@ -60,6 +62,7 @@ const manager = new TableManager({
     if (!ioRef) return;
     ioRef.emit(SC_TABLES_UPDATED, manager.getLobbyTables());
     ioRef.emit(SC_TOURNAMENTS_UPDATED, manager.getLobbyTournaments());
+    ioRef.emit(SC_FEE_POOL, manager.feePool.snapshot());
   },
 });
 
@@ -80,6 +83,7 @@ function emitLobby(socket) {
     players: getCurrentPlayers(),
     socketId: socket.id,
     amount: players[socket.id] ? players[socket.id].bankroll : config.INITIAL_CHIPS_AMOUNT,
+    feePool: manager.feePool.snapshot(),
   };
   socket.emit(SC_RECEIVE_LOBBY_INFO, payload);
 }
@@ -138,6 +142,8 @@ function hideOpponentCards(table, socketId) {
     handOver: table.handOver,
     winMessages: table.winMessages.slice(),
     wentToShowdown: table.wentToShowdown,
+    lastRake: table.lastRake || 0,
+    lastRakeDiscount: !!table.lastRakeDiscount,
     sidePots: table.sidePots.map((sp) => ({
       amount: sp.amount,
       players: sp.players.slice(),
@@ -255,7 +261,7 @@ const init = (socket, io) => {
     io.to(gameId).emit(SC_LOBBY_CHAT, { text, userInfo });
   });
 
-  socket.on(CS_FETCH_LOBBY_INFO, ({ walletAddress, socketId, username }) => {
+  socket.on(CS_FETCH_LOBBY_INFO, ({ walletAddress, socketId, username, stakedXsolla, hasRakeCharm }) => {
     const found = Object.values(players).find((player) => player.id == walletAddress);
     if (found) {
       delete players[found.socketId];
@@ -268,6 +274,7 @@ const init = (socket, io) => {
       username || 'Player',
       config.INITIAL_CHIPS_AMOUNT,
     );
+    players[socket.id].setEconomy({ stakedXsolla, hasRakeCharm });
     emitLobby(socket);
     socket.broadcast.emit(SC_PLAYERS_UPDATED, getCurrentPlayers());
     socket.emit(SC_TOURNAMENTS_UPDATED, manager.getLobbyTournaments());
@@ -568,6 +575,12 @@ const init = (socket, io) => {
     if (res) manager.afterAction(table, res.message);
   });
 
+  socket.on(CS_ECONOMY_SYNC, ({ stakedXsolla, hasRakeCharm }) => {
+    const player = players[socket.id];
+    if (!player) return;
+    player.setEconomy({ stakedXsolla, hasRakeCharm });
+  });
+
   // After on-chain deposit tx succeeds, credit in-game bankroll
   socket.on(CS_XSOLLA_DEPOSIT, ({ amountXsolla, txHash }) => {
     const player = players[socket.id];
@@ -584,7 +597,6 @@ const init = (socket, io) => {
     io.emit(SC_PLAYERS_UPDATED, getCurrentPlayers());
   });
 
-  // Debit bankroll before/after on-chain withdrawPlayCredits
   socket.on(CS_XSOLLA_WITHDRAW, ({ amountXsolla, txHash }) => {
     const player = players[socket.id];
     if (!player) return;
@@ -598,7 +610,6 @@ const init = (socket, io) => {
       });
       return;
     }
-    // Ensure player is not seated with chips in play
     const seated = findSeatBySocketId(socket.id);
     if (seated) {
       socket.emit(SC_XSOLLA_BANKROLL, {

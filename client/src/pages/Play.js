@@ -15,6 +15,9 @@ import { GameUI } from '../components/game/GameUI'
 import { GameStateInfo } from '../components/game/GameStateInfo'
 import BrandingImage from '../components/game/BrandingImage'
 import PokerCard from '../components/game/PokerCard'
+import verseContext from '../context/verse/verseContext'
+import { playerPerks } from '../contracts/itemEcosystem'
+import { STAKE_TIERS } from '../contracts/stakeTiers'
 import background from '../assets/img/background.png'
 import './Play.scss'
 
@@ -22,7 +25,13 @@ const Play = () => {
   const { tableId } = useParams()
   const navigate = useNavigate()
   const { socket } = useContext(socketContext)
-  const { chipsAmount } = useContext(globalContext)
+  const { chipsAmount, stakedXsolla } = useContext(globalContext)
+  const { demo } = useContext(verseContext)
+  const loadout = (demo && demo.loadout) || {}
+  const perks = playerPerks(demo)
+  const goldStake = Number(stakedXsolla) >= STAKE_TIERS[2].min
+  const tableSrc = loadout.tableTheme && loadout.tableTheme.image
+  const cardBackSrc = loadout.cardBack && loadout.cardBack.image
   const {
     messages,
     currentTable,
@@ -93,8 +102,15 @@ const Play = () => {
             </div>
           </PositionedUISlot>
         )}
+        {(perks.rake || goldStake) && (
+          <PositionedUISlot top="2vh" right="1.5rem" scale="0.7" style={{ zIndex: '50' }}>
+            <InfoPill>
+              Rake Charm / Gold stake · 4.5% pot (cap 3 BB)
+            </InfoPill>
+          </PositionedUISlot>
+        )}
         <PokerTableWrapper>
-          <PokerTable />
+          <PokerTable src={tableSrc} />
           {currentTable && (
             <>
               {[1, 2, 3, 4, 5].map((n) => {
@@ -134,7 +150,11 @@ const Play = () => {
                 {currentTable.board &&
                   currentTable.board.length > 0 &&
                   currentTable.board.map((card, index) => (
-                    <PokerCard key={index} card={card} />
+                    <PokerCard
+                      key={index}
+                      card={card}
+                      backSrc={cardBackSrc}
+                    />
                   ))}
               </PositionedUISlot>
               <PositionedUISlot top="-5%" scale="0.60" origin="bottom center">

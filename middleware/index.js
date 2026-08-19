@@ -44,7 +44,9 @@ const configureMiddleware = (app) => {
       max: 100,
       skip: (req) =>
         req.method === 'GET' &&
-        (req.path.startsWith('/uploads/') || req.path.startsWith('/api/images/')),
+        (req.path.startsWith('/uploads/') ||
+          req.path.startsWith('/api/images/') ||
+          req.path.startsWith('/api/hub')),
     }),
   );
 

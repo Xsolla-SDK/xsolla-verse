@@ -1,5 +1,6 @@
 const Table = require('../poker/Table');
 const { BlindSchedule } = require('./BlindSchedule');
+const { tournamentFee, hasRakeDiscount } = require('../rake');
 
 let nextTableId = 10000;
 
@@ -21,6 +22,7 @@ class Tournament {
     this.winners = [];
     this.onUpdate = options.onUpdate || (() => {});
     this.onFinish = options.onFinish || (() => {});
+    this.onFee = options.onFee || (() => {});
   }
 
   lobbyInfo() {
@@ -35,6 +37,7 @@ class Tournament {
       startingStack: this.startingStack,
       registered: this.registrants.length,
       prizePool: this.prizePool,
+      feeBps: tournamentFee(this.buyIn, this.type).bps,
       blinds: this.blindSchedule.current(),
       winners: this.winners,
       tables: Object.values(this.tables).map((t) => ({
@@ -58,7 +61,11 @@ class Tournament {
       return { ok: false, error: 'Insufficient bankroll' };
     }
     player.bankroll -= this.buyIn;
-    this.prizePool += this.buyIn;
+    const { fee, net } = tournamentFee(this.buyIn, this.type, {
+      discount: hasRakeDiscount(player),
+    });
+    this.prizePool += net;
+    if (fee > 0 && typeof this.onFee === 'function') this.onFee(fee, this);
     this.registrants.push(player);
     this.onUpdate(this);
     if (this.type === 'sng' && this.registrants.length >= this.maxPlayers) {

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title XsollaToken
- * @notice Native XSOLLA ERC-20 for XsollaVerse (mirrors Mini Games TILE pattern).
+ * @notice Native XSOLLA ERC-20 for XsollaVerse.
  */
 contract XsollaToken is ERC20, Ownable {
     address public minter;

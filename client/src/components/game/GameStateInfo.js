@@ -37,6 +37,12 @@ export const GameStateInfo = ({ currentTable }) => {
           style={{ minWidth: '150px' }}
         />
       )}
+      {!!currentTable.lastRake && (
+        <InfoPill>
+          Rake {Number(currentTable.lastRake).toFixed(0)}
+          {currentTable.lastRakeDiscount ? ' · 4.5%' : ''}
+        </InfoPill>
+      )}
 
       {currentTable.sidePots &&
         currentTable.sidePots.length > 0 &&

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import universeBg from '../../assets/img/xsolla-universe-bg.png';
+import universeBg from '../../assets/img/xsolla-universe-landing.webp';
 
 const StyledLoadingScreen = styled.div`
   width: 100%;

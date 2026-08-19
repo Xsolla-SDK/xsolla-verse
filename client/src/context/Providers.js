@@ -8,21 +8,27 @@ import GlobalStyles from '../styles/Global'
 import { BrowserRouter } from 'react-router-dom'
 import WebSocketProvider from './websocket/WebsocketProvider'
 import GameState from './game/GameState'
+import LocaProvider from './localization/LocaProvider'
+import VerseProvider from './verse/VerseProvider'
 
 const Providers = ({ children }) => (
   <BrowserRouter>
     <ThemeProvider theme={theme}>
-      <GlobalState>
-        <ModalProvider>
-          <WebSocketProvider>
-            <GameState>
-              <Normalize />
-              <GlobalStyles />
-              {children}
-            </GameState>
-          </WebSocketProvider>
-        </ModalProvider>
-      </GlobalState>
+      <LocaProvider>
+        <GlobalState>
+          <VerseProvider>
+            <ModalProvider>
+              <WebSocketProvider>
+                <GameState>
+                  <Normalize />
+                  <GlobalStyles />
+                  {children}
+                </GameState>
+              </WebSocketProvider>
+            </ModalProvider>
+          </VerseProvider>
+        </GlobalState>
+      </LocaProvider>
     </ThemeProvider>
   </BrowserRouter>
 )

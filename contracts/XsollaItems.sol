@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title XsollaItems
- * @notice ERC-1155 game items / cosmetics for the XsollaVerse shop.
+ * @notice ERC-1155 game items. Soulbound ids cannot be traded (passes / reputation).
  */
 contract XsollaItems is ERC1155, Ownable {
     address public minter;
@@ -14,9 +14,11 @@ contract XsollaItems is ERC1155, Ownable {
     string public symbol = "XSITEM";
 
     mapping(uint256 => string) private _tokenURIs;
+    mapping(uint256 => bool) public soulbound;
 
     event MinterUpdated(address indexed minter);
     event URISet(uint256 indexed id, string uri);
+    event SoulboundSet(uint256 indexed id, bool soulbound);
 
     constructor(address initialMinter) ERC1155("") {
         require(initialMinter != address(0), "Invalid minter");
@@ -33,6 +35,12 @@ contract XsollaItems is ERC1155, Ownable {
         require(msg.sender == minter || msg.sender == owner(), "Unauthorized");
         _tokenURIs[id] = tokenURI_;
         emit URISet(id, tokenURI_);
+    }
+
+    function setSoulbound(uint256 id, bool value) external {
+        require(msg.sender == minter || msg.sender == owner(), "Unauthorized");
+        soulbound[id] = value;
+        emit SoulboundSet(id, value);
     }
 
     function uri(uint256 id) public view override returns (string memory) {
@@ -56,5 +64,20 @@ contract XsollaItems is ERC1155, Ownable {
     ) external {
         require(msg.sender == minter || msg.sender == owner(), "Unauthorized minter");
         _mintBatch(to, ids, amounts, data);
+    }
+
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal override {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+        if (from == address(0) || to == address(0)) return;
+        for (uint256 i = 0; i < ids.length; i++) {
+            require(!soulbound[ids[i]], "Soulbound");
+        }
     }
 }

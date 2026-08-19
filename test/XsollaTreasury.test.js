@@ -65,16 +65,27 @@ describe("XsollaToken + XsollaTreasury", function () {
     );
   });
 
-  it("stakes and unstakes", async function () {
+  it("stakes and unstakes after demo delay", async function () {
     const { token, treasury, user } = await fixture();
-    await treasury.connect(user).buyXsolla({ value: ethers.parseEther("1") });
+    await treasury.connect(user).buyXsolla({ value: ethers.parseEther("100") });
     await token
       .connect(user)
-      .approve(await treasury.getAddress(), ethers.parseEther("1"));
-    await treasury.connect(user).stake(ethers.parseEther("0.4"));
-    expect(await treasury.staked(user.address)).to.equal(ethers.parseEther("0.4"));
-    await treasury.connect(user).unstake(ethers.parseEther("0.4"));
+      .approve(await treasury.getAddress(), ethers.parseEther("100"));
+    await treasury.connect(user).stake(ethers.parseEther("100"));
+    expect(await treasury.stakeTier(user.address)).to.equal(1);
+    await treasury.connect(user).unstake(ethers.parseEther("100"));
     expect(await treasury.staked(user.address)).to.equal(0n);
+    expect(await treasury.pendingUnstake(user.address)).to.equal(
+      ethers.parseEther("100"),
+    );
+    await expect(treasury.connect(user).completeUnstake()).to.be.revertedWith(
+      "Locked",
+    );
+    await ethers.provider.send("evm_increaseTime", [60]);
+    await ethers.provider.send("evm_mine", []);
+    await treasury.connect(user).completeUnstake();
+    expect(await treasury.pendingUnstake(user.address)).to.equal(0n);
+    expect(await token.balanceOf(user.address)).to.equal(ethers.parseEther("100"));
   });
 
   it("operator can release when demoMode is off", async function () {

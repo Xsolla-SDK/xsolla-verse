@@ -8,6 +8,7 @@ import NotFoundPage from '../../pages/NotFoundPage'
 import ConnectWallet from '../../pages/ConnectWallet'
 import Landing from '../../pages/Landing'
 import Profile from '../../pages/Profile'
+import ProductStory from '../../pages/ProductStory'
 
 const pageIn = keyframes`
   from {
@@ -33,6 +34,7 @@ const AppRoutes = () => {
     <PageTransition key={location.pathname}>
       <Routes location={location}>
         <Route path="/" element={<Landing />} />
+        <Route path="/story" element={<ProductStory />} />
         <Route path="/enter" element={<ConnectWallet />} />
         <Route path="/lobby" element={<Lobby />} />
         <Route path="/profile" element={<Profile />} />

@@ -26,8 +26,15 @@ module.exports = {
     { id: 101, name: 'Ace Lounge', minBet: 10, maxBet: 500 },
     { id: 102, name: 'High Limit Pit', minBet: 50, maxBet: 2000 },
   ],  
-  // XSOLLA token economy (1 XSOLLA = CHIPS_PER_XSOLLA in-game chips)
   CHIPS_PER_XSOLLA: Number(process.env.CHIPS_PER_XSOLLA) || 1000,
+  // Xsolla token economy (1 XSOLLA = CHIPS_PER_XSOLLA in-game chips)
+  RAKE_BPS: Number(process.env.RAKE_BPS) || 500,
+  RAKE_DISCOUNT_BPS: Number(process.env.RAKE_DISCOUNT_BPS) || 450,
+  RAKE_CAP_BB: Number(process.env.RAKE_CAP_BB) || 3,
+  SNG_FEE_BPS: Number(process.env.SNG_FEE_BPS) || 1000,
+  MTT_FEE_BPS: Number(process.env.MTT_FEE_BPS) || 800,
+  STAKER_SHARE_BPS: Number(process.env.STAKER_SHARE_BPS) || 3000,
+  STAKE_TIER3: Number(process.env.STAKE_TIER3) || 2000,
   XSOLLA_TOKEN_ADDRESS: process.env.XSOLLA_TOKEN_ADDRESS || '',
   XSOLLA_TREASURY_ADDRESS: process.env.XSOLLA_TREASURY_ADDRESS || '',
   XSOLLA_CHAIN_ID: Number(process.env.XSOLLA_CHAIN_ID) || 31337,

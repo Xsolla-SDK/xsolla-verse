@@ -11,6 +11,8 @@ const StyledPokerTable = styled.img`
   z-index: 2;
 `;
 
-const PokerTable = () => <StyledPokerTable src={table} alt="Poker Table" />;
+const PokerTable = ({ src }) => (
+  <StyledPokerTable src={src || table} alt="Poker Table" />
+)
 
 export default PokerTable;

@@ -5,39 +5,74 @@ import socketContext from '../context/websocket/socketContext'
 import globalContext from '../context/global/globalContext'
 import {
   fetchShopListings,
+  fetchShopGames,
   buyShopItem,
   fetchOwnedItems,
+  readBalances,
+  isRegisteredStudio,
   contractsConfigured,
   addresses,
+  formatXsollaAmount,
 } from '../contracts/xsolla'
 import { groupListingsByGame } from '../contracts/shopCatalog'
+import { shopGameByName } from '../contracts/hubCatalog'
+import { enrichItem, splitLabel, playerPerks, grantsInTitle } from '../contracts/itemEcosystem'
 import {
   ONLINE_GAMES,
   imageForTableRoom,
   imageForTournamentRoom,
 } from '../contracts/onlineCatalog'
-import { CS_FETCH_LOBBY_INFO } from '../game/actions'
-import { connectMetamask } from '../utils/interact'
+import { CS_ECONOMY_SYNC } from '../game/actions'
 import { showVerseAlert } from '../utils/verseAlert'
+import { isPlaytestPending, setPlaytestPending } from '../utils/verseDemo'
+import { clearDemoPersona } from '../utils/demoWallet'
+import { fetchGrants, postGrant } from '../utils/hubApi'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
-import universeBg from '../assets/img/xsolla-universe-bg.png'
+import universeBg from '../assets/img/xsolla-universe-landing.webp'
 import xsollaLogo from '../assets/img/xsolla-logo.svg'
-import PokerChip from '../components/icons/PokerChip'
+import CoinIcon from '../components/icons/CoinIcon'
 import AcademyPanel from '../components/academy/AcademyPanel'
-
-const isGuestWallet = (address) =>
-  typeof address === 'string' && address.toLowerCase().startsWith('0xguest')
+import GameHubPanel from '../components/verse/GameHubPanel'
+import BackpackPanel from '../components/verse/BackpackPanel'
+import SocialPanel from '../components/verse/SocialPanel'
+import GalleryPanel from '../components/verse/GalleryPanel'
+import SupportPanel from '../components/verse/SupportPanel'
+import MarketPanel from '../components/verse/MarketPanel'
+import PlaytestPanel from '../components/verse/PlaytestPanel'
+import FeePoolCard from '../components/verse/FeePoolCard'
+import StudioPanel from '../components/verse/StudioPanel'
+import OperatorPanel from '../components/verse/OperatorPanel'
+import {
+  GuestIcon,
+  OperatorIcon,
+  PlayerIcon,
+  StudioIcon,
+} from '../components/verse/RoleIcons'
+import locaContext from '../context/localization/locaContext'
+import verseContext from '../context/verse/verseContext'
+import {
+  isGuestWallet,
+  isOperatorWallet,
+  resolveVerseRole,
+  tabsForRole,
+  defaultTabForRole,
+} from '../utils/walletRole'
 
 const Lobby = () => {
   const navigate = useNavigate()
   const { socket } = useContext(socketContext)
   const {
     walletAddress,
-    chipsAmount,
+    walletXsolla,
     setWalletAddress,
     setUserName,
     userName,
+    feePool,
+    setStakedXsolla,
+    setWalletXsolla,
   } = useContext(globalContext)
+  const { t, lang, setLang, locales } = useContext(locaContext)
+  const { demo, markQuest, setOwnedNames, addGrant } = useContext(verseContext)
   const {
     lobbyTables,
     tournaments,
@@ -47,15 +82,27 @@ const Lobby = () => {
     registerTournament,
     startTournament,
   } = useContext(gameContext)
-  const [mainTab, setMainTab] = useState('shop')
+  const [mainTab, setMainTab] = useState('hub')
   const [playTab, setPlayTab] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [loginBusy, setLoginBusy] = useState(false)
   const [shopItems, setShopItems] = useState([])
+  const [catalogGames, setCatalogGames] = useState([])
   const [ownedItems, setOwnedItems] = useState([])
   const [selectedShopGame, setSelectedShopGame] = useState(null)
   const [status, setStatus] = useState('')
+  const [showPlaytest, setShowPlaytest] = useState(false)
+  const [isStudio, setIsStudio] = useState(false)
+  const [grants, setGrants] = useState([])
   const isGuest = isGuestWallet(walletAddress)
+  const isOperator = isOperatorWallet(walletAddress)
+  const role = resolveVerseRole({ address: walletAddress, isStudio, isOperator })
+  const tabIds = tabsForRole(role, { isStudio })
+  const RoleIcon = {
+    guest: GuestIcon,
+    player: PlayerIcon,
+    studio: StudioIcon,
+    operator: OperatorIcon,
+  }[role]
 
   useEffect(() => {
     if (walletAddress && contractsConfigured()) {
@@ -68,30 +115,123 @@ const Lobby = () => {
     if (!socket) navigate('/')
   }, [socket, navigate])
 
+  useEffect(() => {
+    if (isPlaytestPending()) setShowPlaytest(true)
+  }, [])
+
+  useEffect(() => {
+    setMainTab(defaultTabForRole(role))
+  }, [role])
+
   const refreshShop = async () => {
+    let owned = ownedItems
     try {
       if (!contractsConfigured() || !addresses.XsollaShop) {
         setShopItems([])
         setOwnedItems([])
-        return
-      }
-      const listings = await fetchShopListings()
-      setShopItems(listings)
-      if (walletAddress) {
-        const owned = await fetchOwnedItems(walletAddress)
-        setOwnedItems(owned)
+        setCatalogGames([])
+        owned = []
+      } else {
+        const listings = await fetchShopListings()
+        setShopItems(listings)
+        try {
+          setCatalogGames(await fetchShopGames())
+        } catch (e) {
+          setCatalogGames([])
+        }
+        if (walletAddress) {
+          owned = await fetchOwnedItems(walletAddress)
+          setOwnedItems(owned)
+          if (setOwnedNames) {
+            setOwnedNames((owned || []).map((i) => i.name).filter(Boolean))
+          }
+        } else {
+          owned = []
+        }
       }
     } catch (e) {
       setStatus(e.message || 'Could not load shop')
     }
+    if (!walletAddress || isGuest || !addresses.XsollaShop) {
+      setIsStudio(false)
+    } else {
+      try {
+        setIsStudio(await isRegisteredStudio(walletAddress))
+      } catch (e) {
+        setIsStudio(false)
+      }
+    }
+    if (walletAddress) {
+      try {
+        setGrants(await fetchGrants({ buyer: walletAddress }))
+      } catch (e) {
+        setGrants([])
+      }
+    } else {
+      setGrants([])
+    }
+    await syncEconomy(owned)
+  }
+
+  const syncEconomy = async (owned = ownedItems) => {
+    if (!walletAddress || isGuest) {
+      if (setWalletXsolla) setWalletXsolla(0)
+      return
+    }
+    let staked = 0
+    let wallet = 0
+    if (contractsConfigured()) {
+      try {
+        const b = await readBalances(walletAddress)
+        staked = Number(b.stakedXsolla) || 0
+        wallet = Number(b.walletXsolla) || 0
+      } catch (e) {
+        // Older treasury or not deployed
+      }
+    }
+    if (setStakedXsolla) setStakedXsolla(staked)
+    if (setWalletXsolla) setWalletXsolla(wallet)
+    if (!socket) return
+    socket.emit(CS_ECONOMY_SYNC, {
+      stakedXsolla: staked,
+      hasRakeCharm: !!playerPerks(demo, owned).rake,
+    })
   }
 
   const onBuyItem = async (itemId) => {
+    if (isGuest) {
+      showVerseAlert(t('tabs.shop'), t('guest.shop'), 'info')
+      return
+    }
     setBusy(true)
     setStatus(`Buying item #${itemId}…`)
     try {
       await buyShopItem(itemId, 1)
       setStatus('Purchase confirmed')
+      markQuest('buy')
+      const item = (shopItems || []).find((row) => String(row.id) === String(itemId))
+      if (item && grantsInTitle(item)) {
+        const payload = {
+          itemId,
+          itemName: item.name,
+          game: item.game || '',
+          gameId: item.gameId || null,
+          buyer: walletAddress,
+          studio: item.studio || '',
+          kind: item.kind || 'pack',
+        }
+        try {
+          const grant = await postGrant(payload)
+          if (addGrant) addGrant(grant)
+          showVerseAlert(
+            t('tabs.shop'),
+            `${t('shop.granted')} ${item.game}`,
+            'success',
+          )
+        } catch (grantErr) {
+          if (addGrant) addGrant({ ...payload, note: `${t('shop.granted')} ${item.game}` })
+        }
+      }
       await refreshShop()
     } catch (e) {
       console.error(e)
@@ -102,31 +242,12 @@ const Lobby = () => {
     }
   }
 
-  const onConnectWallet = async () => {
-    if (!socket || loginBusy) return
-    setLoginBusy(true)
-    try {
-      const result = await connectMetamask()
-      if (!(result && result.event === 'connected' && result.response)) {
-        throw new Error(
-          (result && result.response) || 'Wallet connection failed',
-        )
-      }
-      const address = result.response
-      const username = `${address.slice(0, 6)}…${address.slice(-4)}`
-      setWalletAddress(address)
-      setUserName(username)
-      socket.emit(CS_FETCH_LOBBY_INFO, {
-        walletAddress: address,
-        socketId: socket.id,
-        gameId: 'local',
-        username,
-      })
-    } catch (e) {
-      showVerseAlert('Login', e.message || 'Wallet connection failed', 'error')
-    } finally {
-      setLoginBusy(false)
-    }
+  const onLogout = () => {
+    clearDemoPersona()
+    setWalletAddress('')
+    setUserName('')
+    if (setWalletXsolla) setWalletXsolla(0)
+    navigate('/')
   }
 
   const cashTables = (lobbyTables || []).filter(
@@ -135,9 +256,32 @@ const Lobby = () => {
   const bjTables = (lobbyTables || []).filter((t) => t.gameType === 'blackjack')
   const sng = (tournaments || []).filter((t) => t.type === 'sng')
   const mtt = (tournaments || []).filter((t) => t.type === 'mtt')
-  const shopGames = groupListingsByGame(shopItems)
+  const shopGames = groupListingsByGame(shopItems, catalogGames)
   const activeShopGame =
     selectedShopGame && shopGames.find((g) => g.name === selectedShopGame)
+  const shopMeta = shopGameByName(selectedShopGame)
+  const displayLabel =
+    demo.displayName ||
+    userName ||
+    (walletAddress
+      ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
+      : t('identity.guest'))
+  const goPlayTable = (tableId) => {
+    markQuest('play')
+    setPlaytestPending(true)
+    joinTable(tableId)
+  }
+
+  const openShopGame = (gameName) => {
+    setMainTab('shop')
+    setSelectedShopGame(gameName)
+    refreshShop()
+  }
+
+  const openPlayTab = (tabId) => {
+    setMainTab('play')
+    setPlayTab(tabId)
+  }
 
   const renderActions = (children) => <ActionRow>{children}</ActionRow>
 
@@ -157,123 +301,180 @@ const Lobby = () => {
           </Brand>
 
           <PlayerMeta>
-            <ChipBalance title="Chips">
-              <ChipIconWrap aria-hidden="true">
-                <PokerChip width="22" height="22" />
-              </ChipIconWrap>
-              <MetaValue>
-                {new Intl.NumberFormat().format(chipsAmount || 0)}
-              </MetaValue>
+            <LocaleBar>
+              {(locales || []).map((loc) => (
+                <LocaleBtn
+                  key={loc.id}
+                  type="button"
+                  $active={lang === loc.id}
+                  onClick={() => setLang(loc.id)}
+                >
+                  {loc.label}
+                </LocaleBtn>
+              ))}
+            </LocaleBar>
+            {(() => {
+              const frame =
+                (demo.loadout && demo.loadout.frame) || demo.equipped
+              return frame ? (
+              <EquippedChip title={frame.name}>
+                {frame.image && <img src={frame.image} alt="" />}
+                <span>{frame.name}</span>
+              </EquippedChip>
+              ) : null
+            })()}
+            <ChipBalance title={t('identity.xsolla')}>
+              <CoinIcon />
+              <MetaValue>{formatXsollaAmount(walletXsolla)}</MetaValue>
             </ChipBalance>
-            {isGuest ? (
-              <PrimaryBtn
-                type="button"
-                disabled={loginBusy}
-                onClick={onConnectWallet}
-              >
-                {loginBusy ? 'Connecting…' : 'Connect Wallet'}
-              </PrimaryBtn>
-            ) : (
-              <ProfileLink to="/profile" title="Profile">
-                <MetaLabel>Profile</MetaLabel>
-                <MetaValue>
-                  {userName ||
-                    (walletAddress
-                      ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
-                      : 'Player')}
-                </MetaValue>
-              </ProfileLink>
-            )}
+            <ProfileLink
+              to="/profile"
+              title={`${t(`role.${role}`)} · ${displayLabel}`}
+              aria-label={`${t('identity.profile')}: ${displayLabel}`}
+            >
+              <RoleIconWrap aria-hidden="true">
+                <RoleIcon />
+              </RoleIconWrap>
+              <ProfileName>{displayLabel}</ProfileName>
+            </ProfileLink>
+            <GhostBtn type="button" onClick={onLogout}>
+              {t('identity.logout')}
+            </GhostBtn>
           </PlayerMeta>
         </TopBar>
 
+        {feePool && tabIds.includes('play') && (
+          <FeePoolBar>
+            <FeePoolCard pool={feePool} compact />
+          </FeePoolBar>
+        )}
+
+        {showPlaytest && (
+          <PlaytestModal role="dialog" aria-modal="true" aria-label={t('playtest.title')}>
+            <PlaytestScrim
+              type="button"
+              aria-label="Close"
+              onClick={() => {
+                setShowPlaytest(false)
+                setPlaytestPending(false)
+              }}
+            />
+            <PlaytestBanner>
+              <PlaytestPanel
+                compact
+                ownedItems={ownedItems}
+                games={catalogGames}
+                onSubmitted={() => setShowPlaytest(false)}
+                onEconomyChange={syncEconomy}
+              />
+              <ClosePlaytest
+                type="button"
+                aria-label="Close"
+                onClick={() => {
+                  setShowPlaytest(false)
+                  setPlaytestPending(false)
+                }}
+              >
+                ×
+              </ClosePlaytest>
+            </PlaytestBanner>
+          </PlaytestModal>
+        )}
+
         <Tabs role="tablist">
-          <Tab
-            type="button"
-            role="tab"
-            aria-selected={mainTab === 'shop'}
-            $active={mainTab === 'shop'}
-            onClick={() => {
-              setMainTab('shop')
-              setSelectedShopGame(null)
-              refreshShop()
-            }}
-          >
-            Game Shop
-          </Tab>
-          <Tab
-            type="button"
-            role="tab"
-            aria-selected={mainTab === 'play'}
-            $active={mainTab === 'play'}
-            onClick={() => {
-              setMainTab('play')
-              setPlayTab(null)
-            }}
-          >
-            Online Games
-          </Tab>
-          <Tab
-            type="button"
-            role="tab"
-            aria-selected={mainTab === 'academy'}
-            $active={mainTab === 'academy'}
-            onClick={() => setMainTab('academy')}
-          >
-            Academy
-          </Tab>
+          {(tabIds.includes(mainTab) ? tabIds : [...tabIds, mainTab]).map((id) => (
+            <Tab
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={mainTab === id}
+              $active={mainTab === id}
+              onClick={() => {
+                setMainTab(id)
+                if (id === 'shop' || id === 'backpack' || id === 'market' || id === 'studio') {
+                  setSelectedShopGame(null)
+                  refreshShop()
+                }
+                if (id === 'play') setPlayTab(null)
+              }}
+            >
+              {t(`tabs.${id}`)}
+            </Tab>
+          ))}
         </Tabs>
+
+        {mainTab === 'hub' && (
+          <AnimatedPanel key="main-hub">
+            <GameHubPanel
+              onOpenShop={openShopGame}
+              onPlay={openPlayTab}
+              onPlaytest={() => setShowPlaytest(true)}
+              extraGames={catalogGames}
+              showLounge={tabIds.includes('play')}
+            />
+          </AnimatedPanel>
+        )}
 
         {mainTab === 'shop' && (
           <AnimatedPanel key="main-shop">
           <SectionBlock>
-            {!addresses.XsollaShop ? (
-              <Hint>Shop not deployed. Run npm run deploy:local</Hint>
-            ) : (
-              <>
-                {ownedItems.length > 0 && (
-                  <Hint>
-                    Owned:{' '}
-                    {ownedItems
-                      .map(
-                        (i) =>
-                          `${i.game ? `${i.game} · ` : ''}${i.name} ×${i.quantity}`,
-                      )
-                      .join(' · ')}
-                  </Hint>
-                )}
+            {!addresses.XsollaShop && (
+              <Hint>
+                On-chain shop not deployed. Browse titles below, then run{' '}
+                <code>npm run deploy:local</code> to buy with XSOLLA.
+              </Hint>
+            )}
+            {ownedItems.length > 0 && (
+              <Hint>
+                {t('shop.owned')}:{' '}
+                {ownedItems
+                  .map(
+                    (i) =>
+                      `${i.game ? `${i.game} · ` : ''}${i.name} ×${i.quantity}`,
+                  )
+                  .join(' · ')}
+              </Hint>
+            )}
+            <Hint>
+              Bronze+ stake (100 XSOLLA): 2% off Verse share. Studio cut
+              unchanged.
+            </Hint>
+            {isGuest && <Hint>{t('guest.shop')}</Hint>}
 
-                {!selectedShopGame &&
-                  (shopGames.length === 0 ? (
-                    <Hint>
-                      No shop listings yet. Redeploy with npm run deploy:local
-                    </Hint>
-                  ) : (
-                    <AnimatedPanel key="shop-games">
-                      <Grid>
-                        {shopGames.map((game) => (
-                          <InteractiveCard
-                            key={game.id}
-                            type="button"
-                            onClick={() => setSelectedShopGame(game.name)}
-                          >
-                            <GameCover>
-                              {game.image ? (
-                                <img src={game.image} alt="" />
-                              ) : (
-                                <GameCoverFallback>
-                                  {game.name}
-                                </GameCoverFallback>
-                              )}
-                            </GameCover>
-                            <CardTitle>{game.name}</CardTitle>
-                            {game.blurb && <CardMeta>{game.blurb}</CardMeta>}
-                            <CardMeta>{game.items.length} items</CardMeta>
-                          </InteractiveCard>
-                        ))}
-                      </Grid>
-                    </AnimatedPanel>
-                  ))}
+            {!selectedShopGame &&
+              (shopGames.length === 0 ? (
+                <Hint>
+                  No shop listings yet. Redeploy with npm run deploy:local
+                </Hint>
+              ) : (
+                <AnimatedPanel key="shop-games">
+                  <Grid>
+                    {shopGames.map((game) => (
+                      <InteractiveCard
+                        key={game.id}
+                        type="button"
+                        onClick={() => setSelectedShopGame(game.name)}
+                      >
+                        <GameCover>
+                          {game.image ? (
+                            <img src={game.image} alt="" />
+                          ) : (
+                            <GameCoverFallback>
+                              {game.name}
+                            </GameCoverFallback>
+                          )}
+                        </GameCover>
+                        <CardTitle>{game.name}</CardTitle>
+                        {game.blurb && <CardMeta>{game.blurb}</CardMeta>}
+                        {game.qa && <QaStamp>{game.qa}</QaStamp>}
+                        <CardMeta>
+                          {game.items.length} {t('shop.items')}
+                        </CardMeta>
+                      </InteractiveCard>
+                    ))}
+                  </Grid>
+                </AnimatedPanel>
+              ))}
 
                 {selectedShopGame && (
                   <>
@@ -297,7 +498,9 @@ const Lobby = () => {
                       ) : (
                       <Grid>
                         {(activeShopGame ? activeShopGame.items : []).map(
-                          (item) => (
+                          (raw) => {
+                            const item = enrichItem(raw)
+                            return (
                             <ItemCard key={item.id}>
                               <ItemCover>
                                 {item.image ? (
@@ -310,28 +513,36 @@ const Lobby = () => {
                               </ItemCover>
                               <ItemBody>
                                 <CardTitle>{item.name}</CardTitle>
-                                <PriceMeta title="XSOLLA">
-                                  <ChipIconWrap aria-hidden="true">
-                                    <PokerChip width="18" height="18" />
-                                  </ChipIconWrap>
-                                  <span>
-                                    {new Intl.NumberFormat(undefined, {
-                                      maximumFractionDigits: 2,
-                                    }).format(Number(item.priceXsolla))}
-                                  </span>
+                                {shopMeta && shopMeta.qa && (
+                                  <QaStamp>{shopMeta.qa}</QaStamp>
+                                )}
+                                <QaStamp>
+                                  {item.kind}
+                                  {item.soulbound ? ` · ${t('eco.soulbound')}` : ''}
+                                </QaStamp>
+                                <CardMeta>{splitLabel(item.studioBps)}</CardMeta>
+                                {item.effect && <CardMeta>{item.effect}</CardMeta>}
+                                <PriceMeta title={t('identity.xsolla')}>
+                                  <CoinIcon width="18" height="18" />
+                                  <span>{formatXsollaAmount(item.priceXsolla)}</span>
                                 </PriceMeta>
                                 {renderActions(
-                                  <PrimaryBtn
+                                    <PrimaryBtn
                                     type="button"
-                                    disabled={busy}
+                                    disabled={
+                                      busy ||
+                                      isGuest ||
+                                      !addresses.XsollaShop
+                                    }
                                     onClick={() => onBuyItem(item.id)}
                                   >
-                                    Buy
+                                    {t('shop.buy')}
                                   </PrimaryBtn>,
                                 )}
                               </ItemBody>
                             </ItemCard>
-                          ),
+                            )
+                          },
                         )}
                       </Grid>
                       )}
@@ -343,8 +554,6 @@ const Lobby = () => {
                     {status}
                   </StatusLine>
                 )}
-              </>
-            )}
           </SectionBlock>
           </AnimatedPanel>
         )}
@@ -354,6 +563,7 @@ const Lobby = () => {
           <SectionBlock>
             {!playTab ? (
               <AnimatedPanel key="play-games">
+                <Hint>{t('onlineGames.lead')}</Hint>
                 <Grid>
                   {ONLINE_GAMES.map((game) => (
                     <InteractiveCard
@@ -400,11 +610,17 @@ const Lobby = () => {
                             Seats {table.currentNumberPlayers}/
                             {table.maxPlayers}
                           </CardMeta>
+                          <CardMeta>
+                            Rake 5% pot (cap 3 BB)
+                            {playerPerks(demo, ownedItems).rake
+                              ? ' · Charm 4.5%'
+                              : ''}
+                          </CardMeta>
                           {renderActions(
                             <>
                               <PrimaryBtn
                                 type="button"
-                                onClick={() => joinTable(table.id)}
+                                onClick={() => goPlayTable(table.id)}
                               >
                                 Join
                               </PrimaryBtn>
@@ -434,6 +650,7 @@ const Lobby = () => {
                           <CardMeta>
                             Bets {table.minBet}–{table.maxBet}
                           </CardMeta>
+                          <CardMeta>House edge · no extra rake</CardMeta>
                           <CardMeta>
                             Seats {table.currentNumberPlayers}/
                             {table.maxPlayers}
@@ -442,7 +659,7 @@ const Lobby = () => {
                             <>
                               <PrimaryBtn
                                 type="button"
-                                onClick={() => joinTable(table.id)}
+                                onClick={() => goPlayTable(table.id)}
                               >
                                 Join
                               </PrimaryBtn>
@@ -471,13 +688,21 @@ const Lobby = () => {
                           <CardTitle>{t.name}</CardTitle>
                           <CardMeta>
                             {t.registered}/{t.maxPlayers} · Buy-in {t.buyIn}
+                            {t.feeBps
+                              ? ` · Fee ${Number(t.feeBps) / 100}%`
+                              : t.type === 'mtt'
+                                ? ' · Fee 8%'
+                                : ' · Fee 10%'}
                           </CardMeta>
                           {renderActions(
                             <>
                               <PrimaryBtn
                                 type="button"
                                 disabled={t.status !== 'registering'}
-                                onClick={() => registerTournament(t.id)}
+                                onClick={() => {
+                                  markQuest('play')
+                                  registerTournament(t.id)
+                                }}
                               >
                                 Register
                               </PrimaryBtn>
@@ -519,7 +744,71 @@ const Lobby = () => {
 
         {mainTab === 'academy' && (
           <AnimatedPanel key="main-academy">
-            <AcademyPanel />
+            <AcademyPanel
+              onHub={() => setMainTab('hub')}
+              onPlaytest={() => setShowPlaytest(true)}
+              onProfile={() => navigate('/profile')}
+            />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'backpack' && (
+          <AnimatedPanel key="main-backpack">
+            <BackpackPanel
+              ownedItems={ownedItems}
+              grants={grants}
+              isGuest={isGuest}
+              onInventoryChange={refreshShop}
+            />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'market' && (
+          <AnimatedPanel key="main-market">
+            <MarketPanel
+              ownedItems={ownedItems}
+              isGuest={isGuest}
+              onEconomyChange={syncEconomy}
+              onInventoryChange={refreshShop}
+            />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'studio' && isStudio && (
+          <AnimatedPanel key="main-studio">
+            <StudioPanel onListed={refreshShop} />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'operator' && isOperator && (
+          <AnimatedPanel key="main-operator">
+            <OperatorPanel />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'social' && (
+          <AnimatedPanel key="main-social">
+            <SocialPanel
+              tables={[...(cashTables || []), ...(bjTables || [])]}
+              onSpectate={goPlayTable}
+            />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'gallery' && (
+          <AnimatedPanel key="main-gallery">
+            <GalleryPanel />
+          </AnimatedPanel>
+        )}
+
+        {mainTab === 'support' && (
+          <AnimatedPanel key="main-support">
+            <SupportPanel />
+            <PlaytestPanel
+              ownedItems={ownedItems}
+              games={catalogGames}
+              onEconomyChange={syncEconomy}
+            />
           </AnimatedPanel>
         )}
       </Shell>
@@ -649,6 +938,10 @@ const TopBar = styled.header`
   margin-bottom: 1rem;
 `
 
+const FeePoolBar = styled.div`
+  margin: -0.35rem 0 0.85rem;
+`
+
 const Brand = styled(Link)`
   display: inline-flex;
   align-items: center;
@@ -681,20 +974,144 @@ const PlayerMeta = styled.div`
   gap: 0.55rem;
 `
 
+const LocaleBar = styled.div`
+  display: inline-flex;
+  border: 1px solid rgba(128, 234, 255, 0.28);
+`
+
+const LocaleBtn = styled.button`
+  appearance: none;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  border: none;
+  background: ${(p) =>
+    p.$active ? 'rgba(128, 234, 255, 0.2)' : 'transparent'};
+  color: ${(p) => (p.$active ? '#fff' : 'var(--muted)')};
+`
+
+const EquippedChip = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 160px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(255, 110, 199, 0.4);
+  font-size: 0.72rem;
+
+  img {
+    width: 22px;
+    height: 22px;
+    object-fit: cover;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`
+
+const PlaytestModal = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+`
+
+const PlaytestScrim = styled.button`
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(4, 1, 14, 0.78);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+`
+
+const PlaytestBanner = styled.div`
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(680px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1.1rem 3rem 1.25rem 1.25rem;
+  border: 1px solid rgba(128, 234, 255, 0.35);
+  background: rgba(8, 4, 24, 0.96);
+  box-shadow:
+    0 0 45px rgba(128, 234, 255, 0.14),
+    0 0 70px rgba(255, 110, 199, 0.12);
+`
+
+const ClosePlaytest = styled.button`
+  appearance: none;
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  border: 1px solid rgba(128, 234, 255, 0.35);
+  background: rgba(8, 4, 24, 0.45);
+  color: inherit;
+  font: inherit;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+`
+
+const QaStamp = styled.span`
+  display: inline-block;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid rgba(128, 234, 255, 0.4);
+  color: var(--cyan);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+`
+
 const ProfileLink = styled(Link)`
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.4rem 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.35rem;
+  max-width: 180px;
+  padding: 0 0.65rem 0 0.3rem;
   border: 1px solid rgba(128, 234, 255, 0.28);
   background: rgba(255, 255, 255, 0.04);
-  min-width: 110px;
   text-decoration: none !important;
   color: inherit !important;
 
   &:hover {
     border-color: var(--cyan);
+    color: var(--cyan) !important;
   }
+`
+
+const RoleIconWrap = styled.span`
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 auto;
+  overflow: hidden;
+
+  svg {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+`
+
+const ProfileName = styled.span`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 600;
 `
 
 const ChipBalance = styled.div`
@@ -706,45 +1123,15 @@ const ChipBalance = styled.div`
   background: rgba(255, 255, 255, 0.04);
 `
 
-const ChipIconWrap = styled.span`
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-
-  svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  path {
-    fill: #80eaff;
-  }
-`
-
 const PriceMeta = styled.div`
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   margin: 0.15rem 0 0.2rem;
-  color: #fff;
+  color: #ffd36a;
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-
-  ${ChipIconWrap} {
-    width: 18px;
-    height: 18px;
-
-    svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    path {
-      fill: #ffd36a;
-    }
-  }
 `
 
 const MetaLabel = styled.span`
@@ -775,7 +1162,7 @@ const Tab = styled.button`
   background: transparent;
   color: ${(p) => (p.$active ? '#fff' : 'var(--muted)')};
   font: inherit;
-  font-size: 1rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -906,9 +1293,12 @@ const PrimaryBtn = styled.button`
 
 const GhostBtn = styled.button`
   ${btnBase}
-  border: 1px solid rgba(128, 234, 255, 0.28);
+  border: 1px solid
+    ${(p) =>
+      p.$active ? 'rgba(255, 110, 199, 0.7)' : 'rgba(128, 234, 255, 0.28)'};
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.04);
+  background: ${(p) =>
+    p.$active ? 'rgba(255, 110, 199, 0.16)' : 'rgba(255, 255, 255, 0.04)'};
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {

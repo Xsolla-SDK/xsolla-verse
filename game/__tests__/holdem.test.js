@@ -96,6 +96,21 @@ describe('Hold’em Table integrity', () => {
     expect(total).toBe(300 + 500 + 300);
   });
 
+  test('cash pot takes 5% rake capped at 3 BB', () => {
+    const table = seatedTable();
+    table.bigBlind = 100;
+    table.minBet = 50;
+    const p1 = table.seats[1];
+    const net = table.takeRake(10000, [p1]);
+    expect(table.lastRake).toBe(300);
+    expect(net).toBe(9700);
+    table.handRakeTaken = 0;
+    p1.player.hasRakeCharm = true;
+    const net2 = table.takeRake(1000, [p1]);
+    expect(table.lastRake).toBe(45);
+    expect(net2).toBe(955);
+  });
+
   test('short stack blind does not go negative', () => {
     const table = new Table(1, 'Test', 10000, 5, { minBet: 100, minRaise: 200 });
     const p1 = new Player('s1', 'p1', 'Alice', 10000);

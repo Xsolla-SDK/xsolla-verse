@@ -16,34 +16,69 @@ import {
   mintMockUsdc,
   mintMockUsdt,
   claimReward,
+  completeUnstakeXsolla,
+  cancelUnstakeXsolla,
   readBalances,
   contractsConfigured,
   CHIPS_PER_XSOLLA,
   addresses,
+  formatXsollaAmount,
 } from '../contracts/xsolla'
 import {
+  CS_FETCH_LOBBY_INFO,
   CS_XSOLLA_DEPOSIT,
   CS_XSOLLA_WITHDRAW,
+  CS_ECONOMY_SYNC,
   SC_XSOLLA_BANKROLL,
 } from '../game/actions'
 import { showVerseAlert } from '../utils/verseAlert'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
-import universeBg from '../assets/img/xsolla-universe-bg.png'
+import universeBg from '../assets/img/xsolla-universe-landing.webp'
 import xsollaLogo from '../assets/img/xsolla-logo.svg'
-import PokerChip from '../components/icons/PokerChip'
+import CoinIcon from '../components/icons/CoinIcon'
+import FeePoolCard from '../components/verse/FeePoolCard'
+import { STAKE_TIERS, stakeTierFromAmount } from '../contracts/stakeTiers'
+import { playerPerks } from '../contracts/itemEcosystem'
+import verseContext from '../context/verse/verseContext'
+import { isGuestWallet } from '../utils/walletRole'
+import { clearDemoPersona } from '../utils/demoWallet'
 
-const isGuestWallet = (address) =>
-  typeof address === 'string' && address.toLowerCase().startsWith('0xguest')
+function formatCountdown(unlockAtSec, nowMs) {
+  const secs = Math.max(
+    0,
+    Math.ceil((Number(unlockAtSec) * 1000 - nowMs) / 1000),
+  )
+  if (secs <= 0) return 'ready'
+  if (secs < 120) return `${secs}s`
+  const m = Math.floor(secs / 60)
+  const rem = secs % 60
+  if (m < 60) return `${m}m ${rem}s`
+  return `${Math.floor(m / 60)}h ${m % 60}m`
+}
 
 const Profile = () => {
   const navigate = useNavigate()
   const { socket } = useContext(socketContext)
-  const { walletAddress, chipsAmount, setChipsAmount, userName } =
-    useContext(globalContext)
+  const {
+    walletAddress,
+    walletXsolla,
+    setChipsAmount,
+    setWalletAddress,
+    userName,
+    setUserName,
+    feePool,
+    setStakedXsolla,
+    setWalletXsolla,
+  } = useContext(globalContext)
+  const { demo, setDisplayName } = useContext(verseContext)
   const [amount, setAmount] = useState('1')
+  const [nameDraft, setNameDraft] = useState(
+    () => demo.displayName || userName || '',
+  )
   const [busy, setBusy] = useState(false)
   const [balances, setBalances] = useState(null)
   const [status, setStatus] = useState('')
+  const [now, setNow] = useState(() => Date.now())
   const isGuest = isGuestWallet(walletAddress)
 
   useEffect(() => {
@@ -51,10 +86,10 @@ const Profile = () => {
       navigate('/')
       return undefined
     }
-    if (!walletAddress || isGuest) {
-      navigate('/lobby', { replace: true })
+    if (!walletAddress) {
+      navigate('/', { replace: true })
     }
-  }, [socket, navigate, walletAddress, isGuest])
+  }, [socket, navigate, walletAddress])
 
   useEffect(() => {
     if (!socket) return undefined
@@ -77,17 +112,37 @@ const Profile = () => {
   }, [socket, setChipsAmount])
 
   useEffect(() => {
+    const pending = Number(balances && balances.pendingUnstakeXsolla) || 0
+    const unlock = Number(balances && balances.unstakeUnlockAt) || 0
+    if (pending <= 0 || unlock <= 0) return undefined
+    const tick = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(tick)
+  }, [balances])
+
+  useEffect(() => {
     if (walletAddress && contractsConfigured() && !isGuest) {
       refreshBalances()
     }
     // eslint-disable-next-line
   }, [walletAddress])
 
+  const syncEconomy = (staked) => {
+    const stakedXsolla = Number(staked) || 0
+    if (setStakedXsolla) setStakedXsolla(stakedXsolla)
+    if (!socket) return
+    socket.emit(CS_ECONOMY_SYNC, {
+      stakedXsolla,
+      hasRakeCharm: !!playerPerks(demo).rake,
+    })
+  }
+
   const refreshBalances = async () => {
     try {
       if (!walletAddress || !contractsConfigured() || isGuest) return
       const b = await readBalances(walletAddress)
       setBalances(b)
+      syncEconomy(b.stakedXsolla)
+      if (setWalletXsolla) setWalletXsolla(Number(b.walletXsolla) || 0)
     } catch (e) {
       setStatus(e.message || 'Could not read balances')
     }
@@ -127,7 +182,21 @@ const Profile = () => {
     await run(() => withdrawXsolla(amount), 'Withdraw XSOLLA')
   }
   const onStake = () => run(() => stakeXsolla(amount), 'Stake XSOLLA')
-  const onUnstake = () => run(() => unstakeXsolla(amount), 'Unstake XSOLLA')
+  const onUnstake = () =>
+    run(
+      () => unstakeXsolla(amount),
+      Number(balances && balances.unstakeDelay) > 0
+        ? 'Request unstake'
+        : 'Unstake XSOLLA',
+    )
+  const onCompleteUnstake = () =>
+    run(() => completeUnstakeXsolla(), 'Complete unstake')
+  const onCancelUnstake = () =>
+    run(() => cancelUnstakeXsolla(), 'Cancel unstake')
+  const onStakeTier = (min) => {
+    setAmount(String(min))
+    return run(() => stakeXsolla(min), `Stake ${min} XSOLLA`)
+  }
   const onSwapNative = () => run(() => swapXsolla(amount), 'Swap XSOLLA→native')
   const onSwapToUsdc = () => run(() => swapXsollaToUsdc(amount), 'Swap XSOLLA→USDC')
   const onSwapFromUsdc = () => run(() => swapUsdcToXsolla(amount), 'Swap USDC→XSOLLA')
@@ -137,9 +206,40 @@ const Profile = () => {
   const onMintUsdt = () => run(() => mintMockUsdt(amount), 'Mint mock USDT')
   const onClaim = () => run(() => claimReward(amount), 'Claim reward')
 
-  if (!walletAddress || isGuest) {
+  const saveDisplayName = () => {
+    const next = nameDraft.trim().slice(0, 24)
+    if (!next) return
+    setDisplayName(next)
+    setUserName(next)
+    if (socket && walletAddress) {
+      socket.emit(CS_FETCH_LOBBY_INFO, {
+        walletAddress,
+        socketId: socket.id,
+        gameId: 'local',
+        username: next,
+      })
+    }
+    setStatus('Display name saved')
+  }
+
+  const onLogout = () => {
+    clearDemoPersona()
+    setWalletAddress('')
+    setUserName('')
+    if (setWalletXsolla) setWalletXsolla(0)
+    navigate('/')
+  }
+
+  if (!walletAddress) {
     return null
   }
+
+  const stakedAmt = Number(balances && balances.stakedXsolla) || 0
+  const currentTier = stakeTierFromAmount(stakedAmt)
+  const pendingUnstake = Number(balances && balances.pendingUnstakeXsolla) || 0
+  const unlockAt = Number(balances && balances.unstakeUnlockAt) || 0
+  const unlockReady = pendingUnstake > 0 && Date.now() >= unlockAt * 1000
+  const delaySec = Number(balances && balances.unstakeDelay) || 0
 
   return (
     <Page>
@@ -159,14 +259,13 @@ const Profile = () => {
             <NavLink to="/lobby">Lobby</NavLink>
           </NavLinks>
           <PlayerMeta>
-            <ChipBalance title="Chips">
-              <ChipIconWrap aria-hidden="true">
-                <PokerChip width="22" height="22" />
-              </ChipIconWrap>
-              <MetaValue>
-                {new Intl.NumberFormat().format(chipsAmount || 0)}
-              </MetaValue>
+            <ChipBalance title="XSOLLA">
+              <CoinIcon />
+              <MetaValue>{formatXsollaAmount(walletXsolla)}</MetaValue>
             </ChipBalance>
+            <GhostBtn type="button" onClick={onLogout}>
+              Log out
+            </GhostBtn>
           </PlayerMeta>
         </TopBar>
 
@@ -184,6 +283,96 @@ const Profile = () => {
               </MetaValue>
             </MetaChip>
           </ProfileRow>
+          <ActionRow>
+            <ProfileInput
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              placeholder="Display name"
+              aria-label="Display name"
+              maxLength={24}
+            />
+            <GhostBtn type="button" onClick={saveDisplayName}>
+              Save name
+            </GhostBtn>
+          </ActionRow>
+        </Panel>
+
+        {isGuest ? (
+          <Panel style={{ marginTop: '1rem' }}>
+            <PanelTitle as="h2">Guest</PanelTitle>
+            <PanelSub>
+              Browse the hub as a guest. Shop and stake need a player desk.
+            </PanelSub>
+          </Panel>
+        ) : (
+        <>
+        <Panel style={{ marginTop: '1rem' }}>
+          <PanelTitle as="h2">Membership stake</PanelTitle>
+          <PanelSub>
+            Stake XSOLLA for shop, market, and table perks. Yield is 30% of this
+            session’s table fees — not minted XSOLLA.
+            {delaySec > 0
+              ? ` Unstake delay ${delaySec}s in demo (14 days in production).`
+              : ''}
+          </PanelSub>
+          {currentTier ? (
+            <Hint>
+              Current tier: {currentTier.name} ({stakedAmt.toFixed(2)} XSOLLA)
+            </Hint>
+          ) : (
+            <Hint>Stake 100 XSOLLA for Bronze perks.</Hint>
+          )}
+          <TierGrid>
+            {STAKE_TIERS.map((tier) => {
+              const active = currentTier && currentTier.id === tier.id
+              const reached = currentTier && currentTier.id >= tier.id
+              return (
+                <TierCard key={tier.id} $active={active}>
+                  <MetaLabel>{tier.name}</MetaLabel>
+                  <MetaValue>{tier.min} XSOLLA</MetaValue>
+                  <PerkList>
+                    {tier.perks.map((perk) => (
+                      <li key={perk}>{perk}</li>
+                    ))}
+                  </PerkList>
+                  <GhostBtn
+                    type="button"
+                    disabled={busy || !contractsConfigured()}
+                    onClick={() => onStakeTier(tier.min)}
+                  >
+                    {reached ? 'Add stake' : `Stake ${tier.min}`}
+                  </GhostBtn>
+                </TierCard>
+              )
+            })}
+          </TierGrid>
+          {pendingUnstake > 0 && (
+            <UnstakeBar>
+              <Hint>
+                {pendingUnstake.toFixed(4)} XSOLLA unlocking{' '}
+                {unlockReady
+                  ? 'now'
+                  : `in ${formatCountdown(unlockAt, now)}`}
+              </Hint>
+              <PrimaryBtn
+                type="button"
+                disabled={busy || !unlockReady}
+                onClick={onCompleteUnstake}
+              >
+                Complete unstake
+              </PrimaryBtn>
+              <GhostBtn
+                type="button"
+                disabled={busy}
+                onClick={onCancelUnstake}
+              >
+                Cancel
+              </GhostBtn>
+            </UnstakeBar>
+          )}
+          <FeePoolWrap>
+            <FeePoolCard pool={feePool} />
+          </FeePoolWrap>
         </Panel>
 
         <Panel style={{ marginTop: '1rem' }}>
@@ -263,7 +452,7 @@ const Profile = () => {
                   Stake
                 </GhostBtn>
                 <GhostBtn type="button" disabled={busy} onClick={onUnstake}>
-                  Unstake
+                  {delaySec > 0 ? 'Request unstake' : 'Unstake'}
                 </GhostBtn>
               </ActionRow>
               <ActionRow>
@@ -314,6 +503,8 @@ const Profile = () => {
             </StatusLine>
           )}
         </Panel>
+        </>
+        )}
       </Shell>
     </Page>
   )
@@ -479,22 +670,6 @@ const ChipBalance = styled.div`
   background: rgba(255, 255, 255, 0.04);
 `
 
-const ChipIconWrap = styled.span`
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-
-  svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  path {
-    fill: #80eaff;
-  }
-`
-
 const MetaLabel = styled.span`
   font-size: 0.65rem;
   letter-spacing: 0.14em;
@@ -560,6 +735,44 @@ const BalanceItem = styled.div`
   background: rgba(255, 255, 255, 0.03);
 `
 
+const TierGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.65rem;
+  margin: 0.85rem 0 0.35rem;
+`
+
+const TierCard = styled.div`
+  padding: 0.75rem 0.8rem 0.9rem;
+  border: 1px solid
+    ${(p) =>
+      p.$active ? 'rgba(128, 234, 255, 0.7)' : 'rgba(255, 255, 255, 0.08)'};
+  background: ${(p) =>
+    p.$active ? 'rgba(128, 234, 255, 0.1)' : 'rgba(255, 255, 255, 0.03)'};
+`
+
+const PerkList = styled.ul`
+  margin: 0.45rem 0 0.7rem;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+`
+
+const UnstakeBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.85rem;
+`
+
+const FeePoolWrap = styled.div`
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(128, 234, 255, 0.18);
+`
+
 const ActionRow = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -575,6 +788,10 @@ const AmountInput = styled.input`
   background: rgba(0, 0, 0, 0.35);
   color: var(--ink);
   font: inherit;
+`
+
+const ProfileInput = styled(AmountInput)`
+  width: min(260px, 100%);
 `
 
 const btnBase = `

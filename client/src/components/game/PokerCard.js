@@ -48,8 +48,16 @@ const StyledPokerCardWrapper = styled.div`
   }
 `;
 
-const PokerCard = ({ card: { suit, rank }, width, minWidth, maxWidth }) => {
-  const concat = suit + rank;
+const PokerCard = ({
+  card: { suit, rank },
+  width,
+  minWidth,
+  maxWidth,
+  backSrc,
+}) => {
+  const concat = suit + rank
+  const src =
+    concat === 'hiddenhidden' && backSrc ? backSrc : cards[concat]
 
   return (
     <StyledPokerCardWrapper
@@ -57,9 +65,9 @@ const PokerCard = ({ card: { suit, rank }, width, minWidth, maxWidth }) => {
       minWidth={minWidth}
       maxWidth={maxWidth}
     >
-      <img src={cards[concat]} alt={concat} />
+      <img src={src} alt={concat} />
     </StyledPokerCardWrapper>
-  );
-};
+  )
+}
 
 export default PokerCard;

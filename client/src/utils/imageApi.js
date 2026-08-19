@@ -17,8 +17,7 @@ export async function fetchLandingBackdropUrl() {
   if (!images.length) return null
 
   const pick =
-    images.find((img) => /landing/i.test(img.originalName || '')) ||
-    images.find((img) => /universe|xsolla/i.test(img.originalName || '')) ||
+    images.find((img) => /landing|universe|xsolla/i.test(img.originalName || '')) ||
     images[0]
 
   return imageServiceUrl(pick.filename)

@@ -4,6 +4,7 @@ const Tournament = require('./tournament/Tournament');
 const Player = require('./core/Player');
 const { decidePokerAction, decideBlackjackAction } = require('./bots/BotAI');
 const config = require('../config');
+const { createFeePool } = require('./feePool');
 
 class TableManager {
   constructor(options = {}) {
@@ -16,6 +17,7 @@ class TableManager {
     this.onLobbyUpdate = options.onLobbyUpdate || (() => {});
     this.turnTimeoutMs = options.turnTimeoutMs || config.TURN_TIMEOUT_MS || 15000;
     this.botDelayMs = options.botDelayMs || config.BOT_THINK_MS || 800;
+    this.feePool = createFeePool();
     this.initCashTables();
     this.initBlackjackTables();
     this.initTournaments();
@@ -32,6 +34,10 @@ class TableManager {
         gameType: 'holdem',
         minBet: p.minBet,
         minRaise: p.minBet * 2,
+        onRake: (chips) => {
+          this.feePool.addRake(chips);
+          this.onLobbyUpdate();
+        },
       });
     });
   }
@@ -59,6 +65,10 @@ class TableManager {
       startingStack: config.SNG_STACK || 5000,
       onUpdate: (t) => this.onLobbyUpdate(),
       onFinish: () => this.onLobbyUpdate(),
+      onFee: (chips) => {
+        this.feePool.addTourney(chips);
+        this.onLobbyUpdate();
+      },
     });
     const mtt = new Tournament(2, 'Grand Arena MTT', {
       type: 'mtt',
@@ -68,6 +78,10 @@ class TableManager {
       startingStack: config.MTT_STACK || 5000,
       onUpdate: (t) => this.onLobbyUpdate(),
       onFinish: () => this.onLobbyUpdate(),
+      onFee: (chips) => {
+        this.feePool.addTourney(chips);
+        this.onLobbyUpdate();
+      },
     });
     this.tournaments[1] = sng;
     this.tournaments[2] = mtt;
@@ -107,6 +121,7 @@ class TableManager {
         currentNumberPlayers: table.players.length,
         smallBlind: table.minBet,
         bigBlind: table.minBet * 2,
+        rakeBps: 500,
       };
     });
   }

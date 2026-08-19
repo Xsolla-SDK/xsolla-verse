@@ -4,6 +4,7 @@ const Hand = require('pokersolver').Hand;
 const Seat = require('./Seat');
 const Deck = require('../core/Deck');
 const SidePot = require('./SidePot');
+const { computePotRake, seatsHaveRakeDiscount } = require('../rake');
 
 class Table {
   constructor(id, name, limit, maxPlayers = 5, options = {}) {
@@ -32,6 +33,10 @@ class Table {
     this.sidePots = [];
     this.history = [];
     this.turnTimer = null;
+    this.lastRake = 0;
+    this.lastRakeDiscount = false;
+    this.handRakeTaken = 0;
+    this.onRake = options.onRake || null;
   }
 
   setBlindsAmounts(smallBlind, bigBlind) {
@@ -209,6 +214,9 @@ class Table {
   }
 
   startHand() {
+    this.handRakeTaken = 0;
+    this.lastRake = 0;
+    this.lastRakeDiscount = false;
     this.deck = new Deck();
     this.wentToShowdown = false;
     this.resetBoardAndPot();
@@ -309,12 +317,33 @@ class Table {
     }
   }
 
+  takeRake(amount, seats) {
+    if (this.tournamentId) return Number(amount) || 0;
+    const discount = seatsHaveRakeDiscount(seats || []);
+    const rake = computePotRake(amount, this, {
+      discount,
+      alreadyTaken: this.handRakeTaken,
+    });
+    this.handRakeTaken += rake;
+    this.lastRake = this.handRakeTaken;
+    this.lastRakeDiscount = discount || this.lastRakeDiscount;
+    if (rake > 0 && typeof this.onRake === 'function') {
+      this.onRake(rake, { tableId: this.id, discount });
+    }
+    return Math.max(0, Number(amount) - rake);
+  }
+
   endWithoutShowdown() {
     const winner = this.unfoldedPlayers()[0];
     if (winner) {
-      winner.winHand(this.pot);
+      const gross = this.pot;
+      const net = this.takeRake(gross, [winner]);
+      const rake = gross - net;
+      winner.winHand(net);
       this.winMessages.push(
-        `${winner.player.name} wins $${this.pot.toFixed(2)}`,
+        rake > 0
+          ? `${winner.player.name} wins $${net.toFixed(2)} (rake $${rake.toFixed(2)})`
+          : `${winner.player.name} wins $${net.toFixed(2)}`,
       );
       this.pot = 0;
     }
@@ -586,9 +615,13 @@ class Table {
 
     if (participants.length === 1) {
       const seat = this.seats[participants[0].seatId];
-      seat.winHand(amount);
+      const net = this.takeRake(amount, [seat]);
+      const rake = amount - net;
+      seat.winHand(net);
       this.winMessages.push(
-        `${seat.player.name} wins $${amount.toFixed(2)}`,
+        rake > 0
+          ? `${seat.player.name} wins $${net.toFixed(2)} (rake $${rake.toFixed(2)})`
+          : `${seat.player.name} wins $${net.toFixed(2)}`,
       );
       this.updateHistory();
       return;
@@ -624,14 +657,20 @@ class Table {
       }
     }
 
+    const winnerSeats = unique.map((u) => this.seats[u[0]]).filter(Boolean);
+    const netPot = this.takeRake(amount, winnerSeats);
+    const rake = amount - netPot;
+    const winAmount = unique.length ? netPot / unique.length : 0;
+
     for (let i = 0; i < unique.length; i++) {
       const seat = this.seats[unique[i][0]];
       const handDesc = unique[i][1];
-      const winAmount = amount / unique.length;
       seat.winHand(winAmount);
       if (winAmount > 0) {
         this.winMessages.push(
-          `${seat.player.name} wins $${winAmount.toFixed(2)} with ${handDesc}`,
+          rake > 0 && i === 0
+            ? `${seat.player.name} wins $${winAmount.toFixed(2)} with ${handDesc} (rake $${rake.toFixed(2)})`
+            : `${seat.player.name} wins $${winAmount.toFixed(2)} with ${handDesc}`,
         );
       }
     }

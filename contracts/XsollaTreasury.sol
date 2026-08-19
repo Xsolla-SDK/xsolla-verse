@@ -9,15 +9,7 @@ import "./XsollaToken.sol";
 
 /**
  * @title XsollaTreasury
- * @notice Buy / escrow / stake / swap hub for XSOLLA (TILE Manager analogue).
- *
- * Flow:
- * 1) buyXsolla() with native POL/ETH → mint XSOLLA 1:1 (wei)
- * 2) buyXsollaWithUsdc/Usdt / swap*ForXsolla → mint XSOLLA from stables
- * 3) deposit() → lock XSOLLA as play credits
- * 4) withdrawPlayCredits() in demoMode, or release() by operator
- * 5) stake() / unstake() for VIP / future governance
- * 6) swapXsollaForUsdc/Usdt / swapXsollaForNative() cash out
+ * @notice Buy / escrow / stake / swap hub for XSOLLA.
  */
 contract XsollaTreasury is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -35,6 +27,13 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
 
     mapping(address => uint256) public playCredits;
     mapping(address => uint256) public staked;
+    mapping(address => uint256) public pendingUnstake;
+    mapping(address => uint256) public unstakeUnlockAt;
+
+    uint256 public constant TIER1 = 100 ether;
+    uint256 public constant TIER2 = 500 ether;
+    uint256 public constant TIER3 = 2000 ether;
+    uint256 public unstakeDelay = 60;
 
     event Bought(address indexed user, uint256 amount);
     event BoughtWithUsdc(address indexed user, uint256 xsollaAmount, uint256 usdcAmount);
@@ -43,6 +42,10 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
     event Withdrawn(address indexed user, uint256 amount);
     event Staked(address indexed user, uint256 amount);
     event Unstaked(address indexed user, uint256 amount);
+    event UnstakeRequested(address indexed user, uint256 amount, uint256 unlockAt);
+    event UnstakeCompleted(address indexed user, uint256 amount);
+    event UnstakeCancelled(address indexed user, uint256 amount);
+    event UnstakeDelayUpdated(uint256 unstakeDelay);
     event Swapped(address indexed user, uint256 amount);
     event SwappedXsollaForUsdc(address indexed user, uint256 xsollaAmount, uint256 usdcAmount);
     event SwappedUsdcForXsolla(address indexed user, uint256 usdcAmount, uint256 xsollaAmount);
@@ -88,7 +91,14 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
 
     function setDemoMode(bool enabled) external onlyOwner {
         demoMode = enabled;
+        unstakeDelay = enabled ? 60 : 14 days;
         emit DemoModeUpdated(enabled);
+        emit UnstakeDelayUpdated(unstakeDelay);
+    }
+
+    function setUnstakeDelay(uint256 delay) external onlyOwner {
+        unstakeDelay = delay;
+        emit UnstakeDelayUpdated(delay);
     }
 
     function setUsdc(address usdcAddress) external onlyOwner {
@@ -131,7 +141,7 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
         return (usdtAmount * 1e18) / usdtPerXsolla;
     }
 
-    /// @notice Buy XSOLLA 1:1 with native gas token (POL/ETH), like buyTile().
+    /// @notice Buy XSOLLA 1:1 with native gas token (POL/ETH).
     function buyXsolla() external payable nonReentrant {
         require(msg.value > 0, "Zero value");
         token.mint(msg.sender, msg.value);
@@ -194,12 +204,71 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
         emit Staked(msg.sender, amount);
     }
 
+    function requestUnstake(uint256 amount) public nonReentrant {
+        _requestUnstake(amount);
+    }
+
+    function completeUnstake() public nonReentrant {
+        uint256 amount = pendingUnstake[msg.sender];
+        require(amount > 0, "Nothing pending");
+        require(block.timestamp >= unstakeUnlockAt[msg.sender], "Locked");
+        pendingUnstake[msg.sender] = 0;
+        unstakeUnlockAt[msg.sender] = 0;
+        require(token.transfer(msg.sender, amount), "Transfer failed");
+        emit UnstakeCompleted(msg.sender, amount);
+        emit Unstaked(msg.sender, amount);
+    }
+
+    function cancelUnstake() external nonReentrant {
+        uint256 amount = pendingUnstake[msg.sender];
+        require(amount > 0, "Nothing pending");
+        pendingUnstake[msg.sender] = 0;
+        unstakeUnlockAt[msg.sender] = 0;
+        staked[msg.sender] += amount;
+        emit UnstakeCancelled(msg.sender, amount);
+    }
+
+    /// @notice Instant unstake when delay is 0; otherwise queues a delayed unstake.
     function unstake(uint256 amount) external nonReentrant {
+        if (unstakeDelay == 0) {
+            _unstakeNow(amount);
+        } else {
+            _requestUnstake(amount);
+        }
+    }
+
+    function _requestUnstake(uint256 amount) internal {
+        require(amount > 0, "Zero amount");
+        require(staked[msg.sender] >= amount, "Insufficient stake");
+        staked[msg.sender] -= amount;
+        pendingUnstake[msg.sender] += amount;
+        uint256 unlockAt = block.timestamp + unstakeDelay;
+        unstakeUnlockAt[msg.sender] = unlockAt;
+        emit UnstakeRequested(msg.sender, amount, unlockAt);
+    }
+
+    function _unstakeNow(uint256 amount) internal {
         require(amount > 0, "Zero amount");
         require(staked[msg.sender] >= amount, "Insufficient stake");
         staked[msg.sender] -= amount;
         require(token.transfer(msg.sender, amount), "Transfer failed");
         emit Unstaked(msg.sender, amount);
+    }
+
+    function stakeTier(address user) public view returns (uint8) {
+        uint256 s = staked[user];
+        if (s >= TIER3) return 3;
+        if (s >= TIER2) return 2;
+        if (s >= TIER1) return 1;
+        return 0;
+    }
+
+    function shopDiscountBps(address user) external view returns (uint16) {
+        return stakeTier(user) >= 1 ? 200 : 0;
+    }
+
+    function marketFeeBps(address user) external view returns (uint16) {
+        return stakeTier(user) >= 1 ? 200 : 250;
     }
 
     /// @notice Swap XSOLLA → USDC from treasury liquidity.
@@ -214,7 +283,7 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
         emit SwappedXsollaForUsdc(msg.sender, xsollaAmount, usdcAmount);
     }
 
-    /// @notice Swap USDC → XSOLLA (same as buyXsollaWithUsdc; kept for UI clarity).
+    /// @notice Swap USDC → XSOLLA.
     function swapUsdcForXsolla(uint256 usdcAmount) external nonReentrant {
         require(address(usdc) != address(0), "USDC not set");
         require(usdcAmount > 0, "Zero amount");
@@ -272,19 +341,16 @@ contract XsollaTreasury is Ownable, ReentrancyGuard {
         emit Swapped(msg.sender, amount);
     }
 
-    /// @notice Owner can pull USDC liquidity into the treasury.
     function fundUsdc(uint256 amount) external onlyOwner {
         require(address(usdc) != address(0), "USDC not set");
         usdc.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    /// @notice Owner can pull USDT liquidity into the treasury.
     function fundUsdt(uint256 amount) external onlyOwner {
         require(address(usdt) != address(0), "USDT not set");
         usdt.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    /// @notice Small demo reward mint (TILE claimTile analogue). Cap per call.
     function claimPlayReward(uint256 amount) external nonReentrant {
         require(demoMode, "Rewards claim disabled");
         require(amount > 0 && amount <= 100 ether, "Amount out of range");

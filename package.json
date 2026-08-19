@@ -3,6 +3,7 @@
   "main": "./server.js",
   "scripts": {
     "dev:server": "nodemon ./server",
+    "start": "node scripts/start-all.js",
     "start:backend": "node ./server",
     "start:frontend": "npm install --prefix client && npm start --prefix client",
     "dev": "npx --yes concurrently \"npm run start:backend\" \"npm run start:frontend\"",

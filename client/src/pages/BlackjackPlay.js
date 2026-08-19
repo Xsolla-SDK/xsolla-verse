@@ -4,6 +4,7 @@ import Button from '../components/buttons/Button'
 import gameContext from '../context/game/gameContext'
 import socketContext from '../context/websocket/socketContext'
 import PokerCard from '../components/game/PokerCard'
+import verseContext from '../context/verse/verseContext'
 import styled from 'styled-components'
 
 const Page = styled.div`
@@ -47,7 +48,11 @@ const Title = styled.div`
 const TableFelt = styled.div`
   border: 1px solid #2a5c52;
   border-radius: 1.5rem;
-  background: radial-gradient(ellipse at center, #145a4a 0%, #0a2a24 65%, #061816 100%);
+  background:
+    ${(p) =>
+      p.$felt
+        ? `linear-gradient(180deg, rgba(6,24,22,0.35), rgba(6,24,22,0.72)), url(${p.$felt}) center / cover no-repeat`
+        : 'radial-gradient(ellipse at center, #145a4a 0%, #0a2a24 65%, #061816 100%)'};
   padding: 1.25rem 1rem 1.5rem;
   display: flex;
   flex-direction: column;
@@ -90,8 +95,14 @@ const Seats = styled.div`
 `
 
 const SeatBox = styled.div`
-  border: 1px solid ${(p) => (p.$active ? '#3ce0c0' : '#2a5c52')};
-  box-shadow: ${(p) => (p.$active ? '0 0 0 1px #3ce0c0' : 'none')};
+  border: 1px solid
+    ${(p) => (p.$vip ? '#d4af37' : p.$active ? '#3ce0c0' : '#2a5c52')};
+  box-shadow: ${(p) =>
+    p.$vip
+      ? '0 0 12px rgba(212,175,55,0.45)'
+      : p.$active
+        ? '0 0 0 1px #3ce0c0'
+        : 'none'};
   padding: 0.85rem 0.7rem;
   min-height: 150px;
   text-align: center;
@@ -153,6 +164,11 @@ const BlackjackPlay = () => {
     fillBots,
     messages,
   } = useContext(gameContext)
+  const { demo } = useContext(verseContext)
+  const loadout = (demo && demo.loadout) || {}
+  const feltSrc = loadout.felt && loadout.felt.image
+  const cardBackSrc = loadout.cardBack && loadout.cardBack.image
+  const vipSeat = !!(loadout.seat || loadout.tray)
   const [betAmount, setBetAmount] = useState(10)
 
   useEffect(() => {
@@ -208,7 +224,7 @@ const BlackjackPlay = () => {
           </p>
         </Title>
 
-        <TableFelt>
+        <TableFelt $felt={feltSrc}>
           <Zone>
             <ZoneLabel>Dealer</ZoneLabel>
             <Cards>
@@ -223,6 +239,7 @@ const BlackjackPlay = () => {
                       width="4.5vw"
                       minWidth="42px"
                       maxWidth="70px"
+                      backSrc={cardBackSrc}
                     />
                   ) : null,
                 )
@@ -258,7 +275,7 @@ const BlackjackPlay = () => {
                 }
 
                 return (
-                  <SeatBox key={n} $active={isTurn}>
+                  <SeatBox key={n} $active={isTurn} $vip={vipSeat && n === seatId}>
                     <p>
                       {seat.player.name}
                       {seat.player.isBot ? ' (bot)' : ''}
@@ -278,6 +295,7 @@ const BlackjackPlay = () => {
                             width="3.5vw"
                             minWidth="36px"
                             maxWidth="56px"
+                            backSrc={cardBackSrc}
                           />
                         ) : null,
                       )}

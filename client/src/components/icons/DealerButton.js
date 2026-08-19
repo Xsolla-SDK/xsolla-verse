@@ -1,9 +1,9 @@
-import React from 'react';
-import PropTypes from 'prop-types';
-import dealer from './../../assets/game/dealer.png';
+import React from 'react'
+import dealer from './../../assets/game/dealer.png'
+import holdemDealer from '../../assets/shop/holdem-dealer.png'
 
-const DealerButton = () => (
-  <img className="dealer-img" src={dealer}></img>
-);
+const DealerButton = ({ gold }) => (
+  <img className="dealer-img" src={gold ? holdemDealer : dealer} alt="" />
+)
 
 export default DealerButton;

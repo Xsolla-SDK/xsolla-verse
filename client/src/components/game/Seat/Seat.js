@@ -1,6 +1,7 @@
 import React, { useContext } from 'react'
 import globalContext from '../../../context/global/globalContext'
 import gameContext from '../../../context/game/gameContext'
+import verseContext from '../../../context/verse/verseContext'
 import { PositionedUISlot } from '../PositionedUISlot'
 import { LastAction } from '../LastAction'
 import PokerCard from '../PokerCard'
@@ -19,6 +20,9 @@ import './Seat.scss'
 export const Seat = ({ currentTable, seatNumber, sitDown }) => {
   const { chipsAmount } = useContext(globalContext)
   const { seatId, rebuy } = useContext(gameContext)
+  const { demo } = useContext(verseContext)
+  const loadout = (demo && demo.loadout) || {}
+  const cardBackSrc = loadout.cardBack && loadout.cardBack.image
 
   const seat = currentTable.seats[seatNumber]
   const maxBuyin = currentTable.limit
@@ -110,6 +114,7 @@ export const Seat = ({ currentTable, seatNumber, sitDown }) => {
                     width="5vw"
                     maxWidth="60px"
                     minWidth="30px"
+                    backSrc={cardBackSrc}
                   />
                 ))}
             </Hand>
@@ -117,7 +122,7 @@ export const Seat = ({ currentTable, seatNumber, sitDown }) => {
 
           {currentTable.button === seatNumber && (
             <PositionedUISlot top="-85px" left="-70px" origin="top left" style={{ zIndex: '55' }}>
-              <DealerButton />
+              <DealerButton gold={!!loadout.dealer} />
             </PositionedUISlot>
           )}
           {currentTable.bigBlind === seatNumber && (

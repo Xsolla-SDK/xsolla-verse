@@ -10,8 +10,7 @@
 
 ## 🚀 Introduction
 
-**XsollaVerse** is a decentralized Metaverse platform where users can explore, create, and transact in a fully tokenized virtual world.  
-It leverages blockchain technology for transparent ownership, NFT-based assets, and provably fair gameplay mechanics.
+**XsollaVerse** is a decentralized Metaverse platform where users can explore, create, and transact in a fully tokenized virtual world — powered by **Xsolla** game services.
 
 **Key Features:**
 
@@ -65,20 +64,23 @@ The system is modular and service-oriented:
 
 ## ⚡ Quick Start
 
-### 1️⃣ Clone & Install Dependencies
-```bash
-npm install
-```
+One command starts the **local chain, smart contracts, backend, and frontend**.
 
-### 2️⃣ Run the Development Server
 ```bash
+nvm use 22          # Node.js 22
 npm start
 ```
-### 3️⃣ Access the Application
-Open in your browser:
-```bash
-http://localhost:3000
-```
+
+First run also installs dependencies and creates `server/config/local.env` if needed.
+
+Then open:
+
+- App: `http://localhost:3000`
+- Product story: `http://localhost:3000/story`
+
+Press **Ctrl+C** in that terminal to stop everything.
+
+To run layers separately: `npm run node`, `npm run deploy:local`, `npm run start:backend`, `npm run start:frontend`.
 
 ## 🖼️ Architecture Diagram
 

@@ -41,6 +41,10 @@ Deploy seeds starter cosmetics grouped by video game (Hold’em, Blackjack, Xsol
 ## Commands
 
 ```bash
+# Full local stack (chain + deploy + backend + frontend)
+npm start
+
+# Or contracts only:
 npm install
 npx hardhat compile
 npx hardhat test

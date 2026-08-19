@@ -10,6 +10,9 @@ const GlobalState = ({ children }) => {
   const [tables, setTables] = useState(null);
   const [players, setPlayers] = useState(null);
   const [walletAddress, setWalletAddress] = useState('');
+  const [feePool, setFeePool] = useState(null);
+  const [stakedXsolla, setStakedXsolla] = useState(0);
+  const [walletXsolla, setWalletXsolla] = useState(0);
 
   return (
     <GlobalContext.Provider
@@ -30,6 +33,12 @@ const GlobalState = ({ children }) => {
         setPlayers,
         walletAddress,
         setWalletAddress,
+        feePool,
+        setFeePool,
+        stakedXsolla,
+        setStakedXsolla,
+        walletXsolla,
+        setWalletXsolla,
       }}
     >
       {children}
