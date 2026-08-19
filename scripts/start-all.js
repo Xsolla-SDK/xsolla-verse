@@ -18,8 +18,42 @@ const HARDHAT_CLI = path.join(
   "bootstrap.js"
 );
 const NODE = process.execPath;
+const NODE_DIR = path.dirname(NODE);
 const children = [];
 let shuttingDown = false;
+
+function childEnv(extraEnv = {}) {
+  return {
+    ...process.env,
+    ...extraEnv,
+    FORCE_COLOR: "1",
+    PATH: `${NODE_DIR}${path.delimiter}${process.env.PATH || ""}`,
+  };
+}
+
+function resolveNpmCli() {
+  const candidates = [
+    process.env.npm_execpath,
+    path.join(NODE_DIR, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    path.join(NODE_DIR, "npm"),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return fs.realpathSync(candidate);
+    }
+  }
+  throw new Error(
+    `npm was not found next to Node (${NODE}). Run "nvm use 22" in this terminal, then npm start.`
+  );
+}
+
+function npmSync(args, cwd = ROOT) {
+  runSync(NODE, [resolveNpmCli(), ...args], cwd);
+}
+
+function npmRun(args, extraEnv = {}, cwd = ROOT) {
+  return run(NODE, [resolveNpmCli(), ...args], extraEnv, cwd);
+}
 
 const HARDHAT_ACCOUNT =
   "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
@@ -33,7 +67,7 @@ function log(msg) {
 function run(command, args, extraEnv = {}, cwd = ROOT) {
   const child = spawn(command, args, {
     cwd,
-    env: { ...process.env, ...extraEnv, FORCE_COLOR: "1" },
+    env: childEnv(extraEnv),
     stdio: "inherit",
   });
   children.push(child);
@@ -52,7 +86,7 @@ function run(command, args, extraEnv = {}, cwd = ROOT) {
 function runSync(command, args, cwd = ROOT) {
   const result = spawnSync(command, args, {
     cwd,
-    env: process.env,
+    env: childEnv(),
     stdio: "inherit",
   });
   if (result.error) {
@@ -134,14 +168,14 @@ function ensureInstall() {
 
   if (!fs.existsSync(path.join(ROOT, "node_modules"))) {
     log("Installing root dependencies…");
-    runSync("npm", ["install"]);
+    npmSync(["install"]);
   }
   if (!fs.existsSync(HARDHAT_CLI)) {
     throw new Error("Hardhat is not installed. Run npm install in the project root.");
   }
   if (!fs.existsSync(reactScripts)) {
     log("Installing frontend dependencies…");
-    runSync("npm", ["install"], clientDir);
+    npmSync(["install"], clientDir);
   }
 }
 
@@ -235,8 +269,7 @@ async function main() {
   run(NODE, [path.join(ROOT, "server.js")]);
 
   log("Starting frontend…");
-  run(
-    "npm",
+  npmRun(
     ["start"],
     { BROWSER: process.env.BROWSER || "none" },
     path.join(ROOT, "client")
