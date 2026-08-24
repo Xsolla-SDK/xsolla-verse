@@ -130,7 +130,7 @@ const ConnectWallet = () => {
   }
 
   const enterHub = (walletAddress, username, { guest = false } = {}) => {
-    if (!socket || socket.connected === true) {
+    if (!socket || socket.connected !== true) {
       setError(t('login.hubWait'))
       return
     }
