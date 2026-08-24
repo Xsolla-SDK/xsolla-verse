@@ -42,6 +42,7 @@ import { playerPerks } from '../contracts/itemEcosystem'
 import verseContext from '../context/verse/verseContext'
 import { isGuestWallet } from '../utils/walletRole'
 import { clearDemoPersona } from '../utils/demoWallet'
+import { setPlayerId } from '../utils/playerId'
 
 function formatCountdown(unlockAtSec, nowMs) {
   const secs = Math.max(
@@ -211,6 +212,9 @@ const Profile = () => {
     if (!next) return
     setDisplayName(next)
     setUserName(next)
+    if (walletAddress && !isGuestWallet(walletAddress)) {
+      setPlayerId(walletAddress, next)
+    }
     if (socket && walletAddress) {
       socket.emit(CS_FETCH_LOBBY_INFO, {
         walletAddress,
@@ -668,6 +672,13 @@ const ChipBalance = styled.div`
   padding: 0.4rem 0.75rem;
   border: 1px solid rgba(128, 234, 255, 0.18);
   background: rgba(255, 255, 255, 0.04);
+
+  svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: block;
+  }
 `
 
 const MetaLabel = styled.span`

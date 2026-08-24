@@ -3,11 +3,14 @@ const path = require("path");
 const hre = require("hardhat");
 
 async function main() {
-  const signers = await hre.ethers.getSigners();
+  const connection = await hre.network.getOrCreate();
+  const { ethers } = connection;
+  const networkName = connection.networkName || "localhost";
+  const signers = await ethers.getSigners();
   const deployer = signers[0];
   console.log("Deploying with:", deployer.address);
 
-  const XsollaToken = await hre.ethers.getContractFactory("XsollaToken");
+  const XsollaToken = await ethers.getContractFactory("XsollaToken");
   const token = await XsollaToken.deploy(deployer.address);
   await token.waitForDeployment();
   const tokenAddress = await token.getAddress();
@@ -16,12 +19,12 @@ async function main() {
   let usdcAddress = process.env.USDC_ADDRESS || "";
   let usdcContract = null;
   if (!usdcAddress) {
-    const MockUSDC = await hre.ethers.getContractFactory("MockUSDC");
+    const MockUSDC = await ethers.getContractFactory("MockUSDC");
     usdcContract = await MockUSDC.deploy();
     await usdcContract.waitForDeployment();
     usdcAddress = await usdcContract.getAddress();
     console.log("MockUSDC:", usdcAddress);
-    await (await usdcContract.mint(deployer.address, hre.ethers.parseUnits("1000000", 6))).wait();
+    await (await usdcContract.mint(deployer.address, ethers.parseUnits("1000000", 6))).wait();
   } else {
     console.log("Using existing USDC:", usdcAddress);
   }
@@ -29,17 +32,17 @@ async function main() {
   let usdtAddress = process.env.USDT_ADDRESS || "";
   let usdtContract = null;
   if (!usdtAddress) {
-    const MockUSDT = await hre.ethers.getContractFactory("MockUSDT");
+    const MockUSDT = await ethers.getContractFactory("MockUSDT");
     usdtContract = await MockUSDT.deploy();
     await usdtContract.waitForDeployment();
     usdtAddress = await usdtContract.getAddress();
     console.log("MockUSDT:", usdtAddress);
-    await (await usdtContract.mint(deployer.address, hre.ethers.parseUnits("1000000", 6))).wait();
+    await (await usdtContract.mint(deployer.address, ethers.parseUnits("1000000", 6))).wait();
   } else {
     console.log("Using existing USDT:", usdtAddress);
   }
 
-  const XsollaTreasury = await hre.ethers.getContractFactory("XsollaTreasury");
+  const XsollaTreasury = await ethers.getContractFactory("XsollaTreasury");
   const treasury = await XsollaTreasury.deploy(
     tokenAddress,
     deployer.address,
@@ -50,10 +53,10 @@ async function main() {
   const treasuryAddress = await treasury.getAddress();
   console.log("XsollaTreasury:", treasuryAddress);
 
-  if (hre.network.name === "hardhat" || hre.network.name === "localhost") {
+  if (networkName === "hardhat" || networkName === "localhost") {
     for (const signer of signers.slice(0, 6)) {
       await (
-        await token.mint(signer.address, hre.ethers.parseEther("10000"))
+        await token.mint(signer.address, ethers.parseEther("10000"))
       ).wait();
     }
     console.log("Seeded local demo accounts with 10,000 XSOLLA each");
@@ -63,13 +66,13 @@ async function main() {
   console.log("Minter set to treasury");
 
   // Item shop (XSOLLA-only payments)
-  const XsollaItems = await hre.ethers.getContractFactory("XsollaItems");
+  const XsollaItems = await ethers.getContractFactory("XsollaItems");
   const items = await XsollaItems.deploy(deployer.address);
   await items.waitForDeployment();
   const itemsAddress = await items.getAddress();
   console.log("XsollaItems:", itemsAddress);
 
-  const XsollaShop = await hre.ethers.getContractFactory("XsollaShop");
+  const XsollaShop = await ethers.getContractFactory("XsollaShop");
   const shop = await XsollaShop.deploy(tokenAddress, itemsAddress, deployer.address);
   await shop.waitForDeployment();
   const shopAddress = await shop.getAddress();
@@ -91,12 +94,12 @@ async function main() {
     await (await shop.setStudio(addr, true)).wait();
     console.log("Studio allowlisted:", key, addr);
   }
-  const zero = hre.ethers.ZeroAddress;
+  const zero = ethers.ZeroAddress;
 
   const starterItems = [
     {
       game: 'MARVEL SNAP',
-      price: hre.ethers.parseEther('18'),
+      price: ethers.parseEther('18'),
       name: 'WEBLAUNCH Bundle',
       uri: 'ipfs://xsolla/games/marvel-snap/weblaunch-bundle.json',
       kind: 'pack',
@@ -106,7 +109,7 @@ async function main() {
     },
     {
       game: 'MARVEL SNAP',
-      price: hre.ethers.parseEther('40'),
+      price: ethers.parseEther('40'),
       name: 'Season Pass Boost',
       uri: 'ipfs://xsolla/games/marvel-snap/season-pass-boost.json',
       kind: 'pack',
@@ -116,7 +119,7 @@ async function main() {
     },
     {
       game: 'Cooking Diary',
-      price: hre.ethers.parseEther('12'),
+      price: ethers.parseEther('12'),
       name: 'Chef Starter Pack',
       uri: 'ipfs://xsolla/games/cooking-diary/chef-starter-pack.json',
       kind: 'pack',
@@ -126,7 +129,7 @@ async function main() {
     },
     {
       game: 'Cooking Diary',
-      price: hre.ethers.parseEther('28'),
+      price: ethers.parseEther('28'),
       name: 'Daily Gift Chest',
       uri: 'ipfs://xsolla/games/cooking-diary/daily-gift-chest.json',
       kind: 'pack',
@@ -136,7 +139,7 @@ async function main() {
     },
     {
       game: 'Seekers Notes',
-      price: hre.ethers.parseEther('15'),
+      price: ethers.parseEther('15'),
       name: 'Mystery Energy Pack',
       uri: 'ipfs://xsolla/games/seekers-notes/mystery-energy-pack.json',
       kind: 'pack',
@@ -146,7 +149,7 @@ async function main() {
     },
     {
       game: 'Seekers Notes',
-      price: hre.ethers.parseEther('32'),
+      price: ethers.parseEther('32'),
       name: 'Hidden Object Pass',
       uri: 'ipfs://xsolla/games/seekers-notes/hidden-object-pass.json',
       kind: 'pass',
@@ -156,7 +159,7 @@ async function main() {
     },
     {
       game: 'Chef & Friends',
-      price: hre.ethers.parseEther('14'),
+      price: ethers.parseEther('14'),
       name: 'Kitchen Crew Bundle',
       uri: 'ipfs://xsolla/games/chef-friends/kitchen-crew-bundle.json',
       kind: 'pack',
@@ -166,7 +169,7 @@ async function main() {
     },
     {
       game: 'Chef & Friends',
-      price: hre.ethers.parseEther('26'),
+      price: ethers.parseEther('26'),
       name: 'Friends Feast Pack',
       uri: 'ipfs://xsolla/games/chef-friends/friends-feast-pack.json',
       kind: 'pack',
@@ -176,7 +179,7 @@ async function main() {
     },
     {
       game: 'Ravenhill',
-      price: hre.ethers.parseEther('16'),
+      price: ethers.parseEther('16'),
       name: 'Ravenhill Case File',
       uri: 'ipfs://xsolla/games/ravenhill/case-file.json',
       kind: 'pack',
@@ -186,7 +189,7 @@ async function main() {
     },
     {
       game: 'Ravenhill',
-      price: hre.ethers.parseEther('30'),
+      price: ethers.parseEther('30'),
       name: 'Noir Detective Kit',
       uri: 'ipfs://xsolla/games/ravenhill/noir-detective-kit.json',
       kind: 'pack',
@@ -196,7 +199,7 @@ async function main() {
     },
     {
       game: 'GDAP Showcase',
-      price: hre.ethers.parseEther('10'),
+      price: ethers.parseEther('10'),
       name: 'Manila Indie Bundle',
       uri: 'ipfs://xsolla/games/gdap/manila-indie-bundle.json',
       kind: 'pack',
@@ -206,7 +209,7 @@ async function main() {
     },
     {
       game: 'GDAP Showcase',
-      price: hre.ethers.parseEther('22'),
+      price: ethers.parseEther('22'),
       name: 'Studio Launch Pack',
       uri: 'ipfs://xsolla/games/gdap/studio-launch-pack.json',
       kind: 'pack',
@@ -216,7 +219,7 @@ async function main() {
     },
     {
       game: 'DTI-EMB Export Hits',
-      price: hre.ethers.parseEther('12'),
+      price: ethers.parseEther('12'),
       name: 'Export Ready Pack',
       uri: 'ipfs://xsolla/games/dti-emb/export-ready-pack.json',
       kind: 'pack',
@@ -226,7 +229,7 @@ async function main() {
     },
     {
       game: 'DTI-EMB Export Hits',
-      price: hre.ethers.parseEther('24'),
+      price: ethers.parseEther('24'),
       name: 'Global Payments Kit',
       uri: 'ipfs://xsolla/games/dti-emb/global-payments-kit.json',
       kind: 'pack',
@@ -236,7 +239,7 @@ async function main() {
     },
     {
       game: "Texas Hold'em",
-      price: hre.ethers.parseEther('10'),
+      price: ethers.parseEther('10'),
       name: 'Neon Card Back',
       uri: 'ipfs://xsolla/games/holdem/neon-card-back.json',
       kind: 'cosmetic',
@@ -244,7 +247,7 @@ async function main() {
     },
     {
       game: "Texas Hold'em",
-      price: hre.ethers.parseEther('25'),
+      price: ethers.parseEther('25'),
       name: 'Gold Dealer Button',
       uri: 'ipfs://xsolla/games/holdem/gold-dealer-button.json',
       kind: 'cosmetic',
@@ -252,7 +255,7 @@ async function main() {
     },
     {
       game: "Texas Hold'em",
-      price: hre.ethers.parseEther('50'),
+      price: ethers.parseEther('50'),
       name: 'VIP Table Theme',
       uri: 'ipfs://xsolla/games/holdem/vip-table-theme.json',
       kind: 'cosmetic',
@@ -260,7 +263,7 @@ async function main() {
     },
     {
       game: "Texas Hold'em",
-      price: hre.ethers.parseEther('22'),
+      price: ethers.parseEther('22'),
       name: 'Rake Charm',
       uri: 'ipfs://xsolla/games/holdem/rake-charm.json',
       kind: 'utility',
@@ -268,7 +271,7 @@ async function main() {
     },
     {
       game: 'Blackjack',
-      price: hre.ethers.parseEther('12'),
+      price: ethers.parseEther('12'),
       name: 'Emerald Felt',
       uri: 'ipfs://xsolla/games/blackjack/emerald-felt.json',
       kind: 'cosmetic',
@@ -276,7 +279,7 @@ async function main() {
     },
     {
       game: 'Blackjack',
-      price: hre.ethers.parseEther('20'),
+      price: ethers.parseEther('20'),
       name: 'Chrome Chip Tray',
       uri: 'ipfs://xsolla/games/blackjack/chrome-chip-tray.json',
       kind: 'cosmetic',
@@ -284,7 +287,7 @@ async function main() {
     },
     {
       game: 'Blackjack',
-      price: hre.ethers.parseEther('35'),
+      price: ethers.parseEther('35'),
       name: 'High-Roller Seat',
       uri: 'ipfs://xsolla/games/blackjack/high-roller-seat.json',
       kind: 'cosmetic',
@@ -292,7 +295,7 @@ async function main() {
     },
     {
       game: 'XsollaVerse',
-      price: hre.ethers.parseEther('15'),
+      price: ethers.parseEther('15'),
       name: 'Avatar Frame: Ember',
       uri: 'ipfs://xsolla/games/metaverse/avatar-frame-ember.json',
       kind: 'cosmetic',
@@ -300,7 +303,7 @@ async function main() {
     },
     {
       game: 'XsollaVerse',
-      price: hre.ethers.parseEther('30'),
+      price: ethers.parseEther('30'),
       name: 'Lobby Banner: Neon',
       uri: 'ipfs://xsolla/games/metaverse/lobby-banner-neon.json',
       kind: 'cosmetic',
@@ -308,7 +311,7 @@ async function main() {
     },
     {
       game: 'XsollaVerse',
-      price: hre.ethers.parseEther('25'),
+      price: ethers.parseEther('25'),
       name: 'Ember Circuit Pass',
       uri: 'ipfs://xsolla/games/metaverse/ember-circuit-pass.json',
       kind: 'pass',
@@ -316,7 +319,7 @@ async function main() {
     },
     {
       game: 'XsollaVerse',
-      price: hre.ethers.parseEther('8'),
+      price: ethers.parseEther('8'),
       name: 'Certified Playtester',
       uri: 'ipfs://xsolla/games/metaverse/certified-playtester.json',
       kind: 'bounty',
@@ -325,7 +328,7 @@ async function main() {
     },
     {
       game: 'XsollaVerse',
-      price: hre.ethers.parseEther('18'),
+      price: ethers.parseEther('18'),
       name: 'Market License',
       uri: 'ipfs://xsolla/games/metaverse/market-license.json',
       kind: 'utility',
@@ -409,7 +412,7 @@ async function main() {
   }
   console.log(`Listed ${starterItems.length} ecosystem shop items`);
 
-  const XsollaMarket = await hre.ethers.getContractFactory("XsollaMarket");
+  const XsollaMarket = await ethers.getContractFactory("XsollaMarket");
   const market = await XsollaMarket.deploy(
     tokenAddress,
     itemsAddress,
@@ -425,29 +428,29 @@ async function main() {
   await (await market.setStakeView(treasuryAddress)).wait();
   console.log("Stake perks wired to shop + market");
 
-  if (hre.network.name === "hardhat" || hre.network.name === "localhost") {
+  if (networkName === "hardhat" || networkName === "localhost") {
     await deployer.sendTransaction({
       to: treasuryAddress,
-      value: hre.ethers.parseEther("10"),
+      value: ethers.parseEther("10"),
     });
     console.log("Seeded treasury with 10 ETH");
 
     const usdc =
-      usdcContract || (await hre.ethers.getContractAt("MockUSDC", usdcAddress));
-    await (await usdc.approve(treasuryAddress, hre.ethers.parseUnits("100000", 6))).wait();
-    await (await treasury.fundUsdc(hre.ethers.parseUnits("100000", 6))).wait();
+      usdcContract || (await ethers.getContractAt("MockUSDC", usdcAddress));
+    await (await usdc.approve(treasuryAddress, ethers.parseUnits("100000", 6))).wait();
+    await (await treasury.fundUsdc(ethers.parseUnits("100000", 6))).wait();
     console.log("Seeded treasury with 100,000 USDC");
 
     const usdt =
-      usdtContract || (await hre.ethers.getContractAt("MockUSDT", usdtAddress));
-    await (await usdt.approve(treasuryAddress, hre.ethers.parseUnits("100000", 6))).wait();
-    await (await treasury.fundUsdt(hre.ethers.parseUnits("100000", 6))).wait();
+      usdtContract || (await ethers.getContractAt("MockUSDT", usdtAddress));
+    await (await usdt.approve(treasuryAddress, ethers.parseUnits("100000", 6))).wait();
+    await (await treasury.fundUsdt(ethers.parseUnits("100000", 6))).wait();
     console.log("Seeded treasury with 100,000 USDT");
   }
 
   const deployment = {
-    network: hre.network.name,
-    chainId: (await hre.ethers.provider.getNetwork()).chainId.toString(),
+    network: networkName,
+    chainId: (await ethers.provider.getNetwork()).chainId.toString(),
     deployer: deployer.address,
     XsollaToken: tokenAddress,
     XsollaTreasury: treasuryAddress,
@@ -465,7 +468,7 @@ async function main() {
 
   const outDir = path.join(__dirname, "..", "deployments");
   fs.mkdirSync(outDir, { recursive: true });
-  const outFile = path.join(outDir, `${hre.network.name}.json`);
+  const outFile = path.join(outDir, `${networkName}.json`);
   fs.writeFileSync(outFile, JSON.stringify(deployment, null, 2));
   console.log("Wrote", outFile);
 

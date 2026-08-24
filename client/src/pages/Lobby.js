@@ -1121,6 +1121,13 @@ const ChipBalance = styled.div`
   padding: 0.4rem 0.75rem;
   border: 1px solid rgba(128, 234, 255, 0.18);
   background: rgba(255, 255, 255, 0.04);
+
+  svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: block;
+  }
 `
 
 const PriceMeta = styled.div`

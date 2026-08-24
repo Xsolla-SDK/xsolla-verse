@@ -2,7 +2,7 @@ import { ethers } from 'ethers'
 import addresses from '../contracts/addresses.json'
 
 const LOCAL_CHAIN_ID = Number(
-  process.env.REACT_APP_CHAIN_ID || addresses.chainId || 31337,
+  import.meta.env.VITE_CHAIN_ID || addresses.chainId || 31337,
 )
 
 const toHexChainId = (id) => `0x${Number(id).toString(16)}`

@@ -1,7 +1,12 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { loadTestEnv } = require("./helpers");
 
 describe("XsollaShop (XSOLLA-only)", function () {
+  let expect;
+  let ethers;
+
+  before(async function () {
+    ({ expect, ethers } = await loadTestEnv());
+  });
   async function fixture() {
     const [owner, buyer, studio] = await ethers.getSigners();
 

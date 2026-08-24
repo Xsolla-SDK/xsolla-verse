@@ -38,6 +38,8 @@ XsollaVerse native ERC-20, modeled on Mini Games’ **TILE** token.
 
 Deploy seeds starter cosmetics grouped by video game (Hold’em, Blackjack, XsollaVerse).
 
+Hardhat 3 compiles from **`chain/contracts/`** (a real folder, not a symlink — Windows cannot follow Linux symlinks). `npm start` copies these `.sol` files into `chain/contracts/` before compile.
+
 ## Commands
 
 ```bash
@@ -46,10 +48,10 @@ npm start
 
 # Or contracts only:
 npm install
-npx hardhat compile
-npx hardhat test
+npm run compile
+npm run test:contracts
 # terminal A
-npx hardhat node
+npm run node
 # terminal B
 npm run deploy:local
 ```

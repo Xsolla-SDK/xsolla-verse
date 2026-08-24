@@ -1,0 +1,13 @@
+{
+  "name": "xsollaverse-chain",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "node ../node_modules/hardhat/dist/src/cli.js compile",
+    "node": "node ../node_modules/hardhat/dist/src/cli.js node --hostname 127.0.0.1 --port 8545",
+    "test": "node ../node_modules/hardhat/dist/src/cli.js test",
+    "deploy:local": "node ../node_modules/hardhat/dist/src/cli.js run scripts/deploy.js --network localhost",
+    "deploy:amoy": "node ../node_modules/hardhat/dist/src/cli.js run scripts/deploy.js --network amoy",
+    "deploy:polygon": "node ../node_modules/hardhat/dist/src/cli.js run scripts/deploy.js --network polygon"
+  }
+}

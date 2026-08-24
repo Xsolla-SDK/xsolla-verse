@@ -9,14 +9,8 @@ const net = require("net");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
-const HARDHAT_CLI = path.join(
-  ROOT,
-  "node_modules",
-  "hardhat",
-  "internal",
-  "cli",
-  "bootstrap.js"
-);
+const CHAIN_DIR = path.join(ROOT, "chain");
+const HARDHAT_CLI = path.join(ROOT, "node_modules", "hardhat", "dist", "src", "cli.js");
 const NODE = process.execPath;
 const NODE_DIR = path.dirname(NODE);
 const children = [];
@@ -27,7 +21,7 @@ function childEnv(extraEnv = {}) {
     ...process.env,
     ...extraEnv,
     FORCE_COLOR: "1",
-    PATH: `${NODE_DIR}${path.delimiter}${process.env.PATH || ""}`,
+    PATH: `${path.join(ROOT, "node_modules", ".bin")}${path.delimiter}${NODE_DIR}${path.delimiter}${process.env.PATH || ""}`,
   };
 }
 
@@ -55,6 +49,18 @@ function npmRun(args, extraEnv = {}, cwd = ROOT) {
   return run(NODE, [resolveNpmCli(), ...args], extraEnv, cwd);
 }
 
+function hardhatArgs(args) {
+  return [HARDHAT_CLI, ...args];
+}
+
+function hardhatSync(args, cwd = CHAIN_DIR) {
+  runSync(NODE, hardhatArgs(args), cwd);
+}
+
+function hardhatRun(args, extraEnv = {}, cwd = CHAIN_DIR) {
+  return run(NODE, hardhatArgs(args), extraEnv, cwd);
+}
+
 const HARDHAT_ACCOUNT =
   "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const HARDHAT_KEY =
@@ -69,6 +75,7 @@ function run(command, args, extraEnv = {}, cwd = ROOT) {
     cwd,
     env: childEnv(extraEnv),
     stdio: "inherit",
+    windowsHide: true,
   });
   children.push(child);
   child.on("error", (err) => {
@@ -88,6 +95,7 @@ function runSync(command, args, cwd = ROOT) {
     cwd,
     env: childEnv(),
     stdio: "inherit",
+    windowsHide: true,
   });
   if (result.error) {
     throw result.error;
@@ -159,23 +167,44 @@ function ensureEnv() {
 
 function ensureInstall() {
   const clientDir = path.join(ROOT, "client");
-  const reactScripts = path.join(
-    clientDir,
-    "node_modules",
-    ".bin",
-    "react-scripts"
-  );
+  const viteBin = path.join(clientDir, "node_modules", ".bin", "vite");
 
-  if (!fs.existsSync(path.join(ROOT, "node_modules"))) {
+  if (!fs.existsSync(HARDHAT_CLI)) {
     log("Installing root dependencies…");
     npmSync(["install"]);
   }
   if (!fs.existsSync(HARDHAT_CLI)) {
-    throw new Error("Hardhat is not installed. Run npm install in the project root.");
+    throw new Error(
+      `Hardhat is still missing at ${HARDHAT_CLI}. Run "npm install" in ${ROOT} and check it finished without errors (devDependencies must not be skipped).`
+    );
   }
-  if (!fs.existsSync(reactScripts)) {
+  if (!fs.existsSync(viteBin)) {
     log("Installing frontend dependencies…");
     npmSync(["install"], clientDir);
+  }
+}
+
+function ensureChainContracts() {
+  const srcDir = path.join(ROOT, "contracts");
+  const destDir = path.join(CHAIN_DIR, "contracts");
+  if (!fs.existsSync(srcDir)) {
+    throw new Error(`Solidity sources missing at ${srcDir}`);
+  }
+
+  try {
+    const stat = fs.lstatSync(destDir);
+    // Linux checkout: symlink. Windows git: often a text file named "contracts".
+    if (stat.isSymbolicLink() || stat.isFile()) {
+      fs.unlinkSync(destDir);
+    }
+  } catch (err) {
+    if (err.code !== "ENOENT") throw err;
+  }
+
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const name of fs.readdirSync(srcDir)) {
+    if (!name.endsWith(".sol")) continue;
+    fs.copyFileSync(path.join(srcDir, name), path.join(destDir, name));
   }
 }
 
@@ -235,38 +264,28 @@ async function main() {
   log("Starting local stack (chain + contracts + backend + frontend)");
   ensureEnv();
   ensureInstall();
+  ensureChainContracts();
 
   log("Compiling contracts…");
-  runSync(NODE, [HARDHAT_CLI, "compile"]);
+  hardhatSync(["compile"]);
 
   let chainChild = null;
   if (await portInUse(8545)) {
     log("Port 8545 is already in use — reusing that chain");
   } else {
     log("Starting Hardhat node on 127.0.0.1:8545…");
-    chainChild = run(NODE, [
-      HARDHAT_CLI,
-      "node",
-      "--hostname",
-      "127.0.0.1",
-      "--port",
-      "8545",
-    ]);
+    chainChild = hardhatRun(["node", "--hostname", "127.0.0.1", "--port", "8545"]);
     await waitForPort(8545, { child: chainChild });
     log("Hardhat node is ready");
   }
 
   log("Deploying contracts…");
-  runSync(NODE, [HARDHAT_CLI, "run", "scripts/deploy.js", "--network", "localhost"]);
-
-  if (await portInUse(5001)) {
-    log(
-      "WARNING: port 5001 is already in use. Frontend expects 5001 — kill the other process if the app does not load."
-    );
-  }
+  hardhatSync(["run", "scripts/deploy.js", "--network", "localhost"]);
 
   log("Starting backend…");
-  run(NODE, [path.join(ROOT, "server.js")]);
+  const backendChild = run(NODE, [path.join(ROOT, "server.js")], { PORT: "5001" });
+  await waitForPort(5001, { child: backendChild });
+  log("Backend is ready on http://127.0.0.1:5001");
 
   log("Starting frontend…");
   npmRun(

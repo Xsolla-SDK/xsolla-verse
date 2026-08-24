@@ -7,7 +7,9 @@ loca/~$Loca_Keys_Strings_DE_EN.xlsx
 /artifacts
 /coverage
 /typechain-types
-/uploads
 !/uploads/.gitkeep
+/uploads/images/landing_.png
+/client/build
+/client/dist
 attach.js
 INTERVIEW_SCENARIOS.md

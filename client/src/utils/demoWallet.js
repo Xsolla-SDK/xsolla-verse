@@ -5,7 +5,7 @@ const HARDHAT_MNEMONIC =
   'test test test test test test test test test test test junk'
 
 const SESSION_KEY = 'gsv-demo-persona'
-const LOCAL_RPC = process.env.REACT_APP_RPC_URL || 'http://127.0.0.1:8545'
+const LOCAL_RPC = import.meta.env.VITE_RPC_URL || 'http://127.0.0.1:8545'
 
 export const DEMO_PERSONAS = {
   operator: { id: 'operator', index: 0, username: 'Operator' },
@@ -14,8 +14,9 @@ export const DEMO_PERSONAS = {
 }
 
 export function walletForIndex(index) {
-  return ethers.Wallet.fromMnemonic(
+  return ethers.HDNodeWallet.fromPhrase(
     HARDHAT_MNEMONIC,
+    undefined,
     `m/44'/60'/0'/0/${index}`,
   )
 }
@@ -50,6 +51,6 @@ export function getDemoPersonaId() {
 export async function getDemoSigner() {
   const spec = DEMO_PERSONAS[getDemoPersonaId()]
   if (!spec) return null
-  const provider = new ethers.providers.JsonRpcProvider(LOCAL_RPC)
+  const provider = new ethers.JsonRpcProvider(LOCAL_RPC)
   return walletForIndex(spec.index).connect(provider)
 }

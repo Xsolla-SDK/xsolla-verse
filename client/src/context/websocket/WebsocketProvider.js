@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react'
 import SocketContext from './socketContext'
-import io from 'socket.io-client'
+import { io } from 'socket.io-client'
 import {
   CS_DISCONNECT,
   SC_PLAYERS_UPDATED,

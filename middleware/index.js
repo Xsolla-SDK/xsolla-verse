@@ -1,32 +1,47 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const mongoSanitize = require('express-mongo-sanitize');
-// const helmet = require('helmet');
-const xssClean = require('xss-clean');
+const xssClean = require('xss-clean/lib/xss');
 const expressRateLimit = require('express-rate-limit');
 const hpp = require('hpp');
 const cors = require('cors');
 const imageService = require('../services/imageService');
 
-const configureMiddleware = (app) => {
-  // Body-parser middleware
-  app.use(express.json());
+function sanitizeInPlace(value) {
+  if (!value || typeof value !== 'object') return;
+  mongoSanitize.sanitize(value);
+}
 
-  // Cookie Parser
+function applyXssInPlace(target) {
+  if (!target || typeof target !== 'object') return;
+  const cleaned = xssClean.clean(target);
+  if (!cleaned || typeof cleaned !== 'object') return;
+  for (const key of Object.keys(target)) {
+    delete target[key];
+  }
+  Object.assign(target, cleaned);
+}
+
+const configureMiddleware = (app) => {
+  app.use(express.json());
   app.use(cookieParser());
 
-  // MongoDB data sanitizer
-  app.use(mongoSanitize());
+  app.use((req, _res, next) => {
+    try {
+      sanitizeInPlace(req.body);
+      sanitizeInPlace(req.params);
+      sanitizeInPlace(req.query);
+      applyXssInPlace(req.body);
+      applyXssInPlace(req.params);
+      applyXssInPlace(req.query);
+    } catch (_err) {
+      // Express 5 query is a getter; skip rewrite rather than fail the request
+    }
+    next();
+  });
 
-  // Helmet improves API security by setting some additional header checks
-  // app.use(helmet());
-
-  app.use(xssClean());
-
-  // Enable CORS early so static image URLs work cross-origin
   app.use(cors());
 
-  // Serve uploaded images without hitting the API rate limiter
   imageService.ensureDirs();
   app.use(
     '/uploads',
@@ -37,11 +52,10 @@ const configureMiddleware = (app) => {
     }),
   );
 
-  // Add rate limit to API (100 requests per 10 mins), skip static/image GETs
   app.use(
     expressRateLimit({
       windowMs: 10 * 60 * 1000,
-      max: 100,
+      limit: 100,
       skip: (req) =>
         req.method === 'GET' &&
         (req.path.startsWith('/uploads/') ||
@@ -50,7 +64,6 @@ const configureMiddleware = (app) => {
     }),
   );
 
-  // Prevent http param pollution
   app.use(hpp());
 };
 
