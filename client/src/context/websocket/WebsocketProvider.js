@@ -18,21 +18,34 @@ const WebSocketProvider = ({ children }) => {
   const [socketId, setSocketId] = useState(null)
 
   useEffect(() => {
-    const next = io(config.socketURI, {
-      transports: ['websocket'],
-      upgrade: false,
+    const next = io(config.socketURI || undefined, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      reconnection: true,
+      reconnectionAttempts: 8,
+      reconnectionDelay: 500,
     })
+
+    window.socket = next
+    setSocket(next)
 
     const onConnect = () => {
       window.socket = next
       setSocket(next)
+      setSocketId(next.id)
     }
 
-    const onLobbyInfo = ({ tables, players, socketId: id, amount, feePool }) => {
-      setSocketId(id)
+    const onDisconnect = () => {
+      setSocketId(null)
+    }
+
+    const onLobbyInfo = (payload = {}) => {
+      const { tables, players, socketId: id, amount, feePool } = payload
+      if (id) setSocketId(id)
       if (amount != null) setChipsAmount(amount)
-      setTables(tables)
-      setPlayers(players)
+      setTables(tables || [])
+      setPlayers(players || [])
       if (feePool && setFeePool) setFeePool(feePool)
     }
 
@@ -50,6 +63,7 @@ const WebSocketProvider = ({ children }) => {
     }
 
     next.on('connect', onConnect)
+    next.on('disconnect', onDisconnect)
     next.on(SC_RECEIVE_LOBBY_INFO, onLobbyInfo)
     next.on(SC_PLAYERS_UPDATED, onPlayersUpdated)
     next.on(SC_TABLES_UPDATED, onTablesUpdated)
@@ -59,6 +73,7 @@ const WebSocketProvider = ({ children }) => {
     return () => {
       window.removeEventListener('beforeunload', onUnload)
       next.off('connect', onConnect)
+      next.off('disconnect', onDisconnect)
       next.off(SC_RECEIVE_LOBBY_INFO, onLobbyInfo)
       next.off(SC_PLAYERS_UPDATED, onPlayersUpdated)
       next.off(SC_TABLES_UPDATED, onTablesUpdated)

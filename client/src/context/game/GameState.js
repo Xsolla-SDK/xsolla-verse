@@ -116,10 +116,11 @@ const GameState = ({ children }) => {
       }
     })
     socket.on(SC_RECEIVE_LOBBY_INFO, (payload) => {
-      setLobbyTables(payload.tables || [])
-      setTournaments(payload.tournaments || [])
-      if (payload.amount != null && setChipsAmount) {
-        setChipsAmount(payload.amount)
+      const info = payload || {}
+      setLobbyTables(info.tables || [])
+      setTournaments(info.tournaments || [])
+      if (info.amount != null && setChipsAmount) {
+        setChipsAmount(info.amount)
       }
     })
 

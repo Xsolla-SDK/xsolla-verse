@@ -10,36 +10,36 @@ import * as Contracts from "./index.js";
 
 declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
-  getContractFactory(name: 'MockUSDC', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockUSDC__factory>
-getContractFactory(name: 'MockUSDT', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockUSDT__factory>
+  getContractFactory(name: 'MockUSDT', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockUSDT__factory>
+getContractFactory(name: 'MockUSDC', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockUSDC__factory>
+getContractFactory(name: 'XsollaItems', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.XsollaItems__factory>
 getContractFactory(name: 'XsollaMarket', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.XsollaMarket__factory>
 getContractFactory(name: 'XsollaShop', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.XsollaShop__factory>
 getContractFactory(name: 'XsollaTreasury', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.XsollaTreasury__factory>
-getContractFactory(name: 'XsollaItems', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.XsollaItems__factory>
 getContractFactory(name: 'XsollaToken', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.XsollaToken__factory>
 
-  getContractAt(name: 'MockUSDC', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockUSDC>
-getContractAt(name: 'MockUSDT', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockUSDT>
+  getContractAt(name: 'MockUSDT', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockUSDT>
+getContractAt(name: 'MockUSDC', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockUSDC>
+getContractAt(name: 'XsollaItems', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.XsollaItems>
 getContractAt(name: 'XsollaMarket', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.XsollaMarket>
 getContractAt(name: 'XsollaShop', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.XsollaShop>
 getContractAt(name: 'XsollaTreasury', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.XsollaTreasury>
-getContractAt(name: 'XsollaItems', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.XsollaItems>
 getContractAt(name: 'XsollaToken', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.XsollaToken>
 
-  deployContract(name: 'MockUSDC', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDC>
-deployContract(name: 'MockUSDT', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDT>
+  deployContract(name: 'MockUSDT', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDT>
+deployContract(name: 'MockUSDC', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDC>
+deployContract(name: 'XsollaItems', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaItems>
 deployContract(name: 'XsollaMarket', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaMarket>
 deployContract(name: 'XsollaShop', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaShop>
 deployContract(name: 'XsollaTreasury', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaTreasury>
-deployContract(name: 'XsollaItems', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaItems>
 deployContract(name: 'XsollaToken', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaToken>
 
-  deployContract(name: 'MockUSDC', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDC>
-deployContract(name: 'MockUSDT', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDT>
+  deployContract(name: 'MockUSDT', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDT>
+deployContract(name: 'MockUSDC', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDC>
+deployContract(name: 'XsollaItems', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaItems>
 deployContract(name: 'XsollaMarket', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaMarket>
 deployContract(name: 'XsollaShop', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaShop>
 deployContract(name: 'XsollaTreasury', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaTreasury>
-deployContract(name: 'XsollaItems', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaItems>
 deployContract(name: 'XsollaToken', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.XsollaToken>
 
     // default types

@@ -47,7 +47,7 @@ const shortAddr = (addr) =>
 const ConnectWallet = () => {
   const { setWalletAddress, setUserName } = useContext(globalContext)
   const { t } = useContext(locaContext)
-  const { socket } = useContext(socketContext)
+  const { socket, socketId } = useContext(socketContext)
   const navigate = useNavigate()
   const location = useLocation()
   const [address, setAddress] = useState('')
@@ -130,6 +130,7 @@ const ConnectWallet = () => {
   }
 
   const enterHub = (walletAddress, username, { guest = false } = {}) => {
+    // Interview Bug 2 (plant): change `!== true` to `=== true` so Enter Hub never proceeds.
     if (!socket || socket.connected !== true) {
       setError(t('login.hubWait'))
       return
@@ -174,7 +175,7 @@ const ConnectWallet = () => {
     onDemoDesk(id)
   }
 
-  const hubReady = Boolean(socket && socket.connected)
+  const hubReady = Boolean(socket && socket.connected && socketId)
   const canEnter = Boolean(address && isValidPlayerId(playerId) && hubReady && !busy)
   const activeDesk = DESKS.find((desk) => {
     const persona = describePersona(desk.id)
