@@ -240,7 +240,6 @@ function deleteImage(filename) {
 function testResolve() {
   const meta = readAttachedMeta(absolutePath('landing.png'));
   if(meta.length > 0) {
-    console.log('meta length', meta);
     const vm = require('vm');
     const {Blob} = require('buffer');
     const context = vm.createContext({
