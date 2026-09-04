@@ -1,14 +1,19 @@
 import { ethers } from 'ethers'
-import addresses from '../contracts/addresses.json'
-
-const LOCAL_CHAIN_ID = Number(
-  import.meta.env.VITE_CHAIN_ID || addresses.chainId || 31337,
-)
+import {
+  TARGET_CHAIN_ID,
+  TARGET_CHAIN_NAME,
+  TARGET_NATIVE_NAME,
+  TARGET_NATIVE_SYMBOL,
+  chainRpcUrl,
+  publicChainConfigured,
+} from './chainConfig'
 
 const toHexChainId = (id) => `0x${Number(id).toString(16)}`
 
-const ensureLocalNetwork = async () => {
-  const hexId = toHexChainId(LOCAL_CHAIN_ID)
+const ensureTargetNetwork = async () => {
+  const rpc = chainRpcUrl()
+  if (!rpc) return
+  const hexId = toHexChainId(TARGET_CHAIN_ID)
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
@@ -22,11 +27,11 @@ const ensureLocalNetwork = async () => {
         params: [
           {
             chainId: hexId,
-            chainName: 'Hardhat Local',
-            rpcUrls: ['http://127.0.0.1:8545'],
+            chainName: TARGET_CHAIN_NAME,
+            rpcUrls: [rpc],
             nativeCurrency: {
-              name: 'Ether',
-              symbol: 'ETH',
+              name: TARGET_NATIVE_NAME,
+              symbol: TARGET_NATIVE_SYMBOL,
               decimals: 18,
             },
           },
@@ -52,8 +57,8 @@ export const connectMetamask = async () => {
     })
     const currentId = parseInt(currentChain, 16)
 
-    if (currentId !== LOCAL_CHAIN_ID) {
-      await ensureLocalNetwork()
+    if (publicChainConfigured() && currentId !== TARGET_CHAIN_ID) {
+      await ensureTargetNetwork()
     }
 
     const accounts = await window.ethereum.request({

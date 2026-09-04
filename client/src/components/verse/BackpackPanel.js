@@ -5,6 +5,7 @@ import { imageForShopItem } from '../../contracts/shopCatalog'
 import { enrichItem, splitLabel } from '../../contracts/itemEcosystem'
 import { addresses, listMarketItem } from '../../contracts/xsolla'
 import { showVerseAlert } from '../../utils/verseAlert'
+import { chainOfflineCopy } from '../../utils/chainConfig'
 import verseFrame from '../../assets/shop/verse-frame.png'
 import {
   Card,
@@ -122,7 +123,7 @@ const BackpackPanel = ({
           </Ghost>
         ))}
       </Row>
-      {!marketDeployed && <Meta>{t('market.deploy')}</Meta>}
+      {!marketDeployed && <Meta>{chainOfflineCopy()}</Meta>}
       {items.length === 0 ? (
         <Meta>{t('backpack.empty')}</Meta>
       ) : visibleItems.length === 0 ? (

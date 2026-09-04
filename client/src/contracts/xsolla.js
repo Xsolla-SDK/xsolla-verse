@@ -3,13 +3,16 @@ import abis from './abis.json'
 import addresses from './addresses.json'
 import { enrichItem } from './itemEcosystem'
 import { getDemoSigner } from '../utils/demoWallet'
+import { publicChainConfigured, chainOfflineCopy } from '../utils/chainConfig'
 
 export const CHIPS_PER_XSOLLA = 1000
 export const USDC_DECIMALS = 6
 export const USDT_DECIMALS = 6
 
 export function contractsConfigured() {
-  return Boolean(addresses.XsollaToken && addresses.XsollaTreasury)
+  if (!addresses.XsollaToken || !addresses.XsollaTreasury) return false
+  if (import.meta.env.PROD && !publicChainConfigured()) return false
+  return true
 }
 
 function isHexAddress(value) {
@@ -29,7 +32,7 @@ export async function getSigner() {
 
 export async function getContracts() {
   if (!contractsConfigured()) {
-    throw new Error('Xsolla contracts not deployed. Run npm run deploy:local')
+    throw new Error(chainOfflineCopy())
   }
   const required = [
     addresses.XsollaToken,

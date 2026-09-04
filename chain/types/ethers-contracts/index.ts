@@ -14,5 +14,5 @@ export { MockUSDC__factory } from './factories/MockUSDC__factory.js';
 export { XsollaItems__factory } from './factories/XsollaItems__factory.js';
 export { XsollaMarket__factory } from './factories/XsollaMarket__factory.js';
 export { XsollaShop__factory } from './factories/XsollaShop__factory.js';
-export { XsollaTreasury__factory } from './factories/XsollaTreasury__factory.js';
 export { XsollaToken__factory } from './factories/XsollaToken__factory.js';
+export { XsollaTreasury__factory } from './factories/XsollaTreasury__factory.js';

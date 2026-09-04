@@ -38,6 +38,8 @@ const en = {
     demoOperator: 'Enter as operator',
     hint: 'Connect a wallet and create your player ID to enter.',
     walletFail: 'Could not open that desk. Is the local node running?',
+    ipDeniedTitle: 'Access denied',
+    ipDeniedOk: 'OK',
   },
   login: {
     title: 'Sign in',
@@ -54,6 +56,8 @@ const en = {
     enter: 'Enter Hub',
     entering: 'Entering…',
     hubWait: 'Waiting for the Hub connection…',
+    ipDenied:
+      'Your IP address is not allowed to enter. Please contact administrator for support.',
     walletFail: 'Could not connect. Install MetaMask and use Hardhat Local (31337).',
     demoHint: 'Local demo only: Operator / Studio / Player use Hardhat accounts 0, 1, and 5.',
   },
@@ -427,6 +431,8 @@ const es = {
     demoOperator: 'Entrar como operador',
     hint: 'Conecta una cartera y crea tu ID para entrar.',
     walletFail: 'No se pudo abrir. ¿Está el nodo local en marcha?',
+    ipDeniedTitle: 'Acceso denegado',
+    ipDeniedOk: 'OK',
   },
   login: {
     title: 'Iniciar sesión',
@@ -443,6 +449,8 @@ const es = {
     enter: 'Entrar al Hub',
     entering: 'Entrando…',
     hubWait: 'Esperando conexión con el Hub…',
+    ipDenied:
+      'Tu dirección IP no tiene permitido entrar. Contacta al administrador para obtener ayuda.',
     walletFail: 'No se pudo conectar. Instala MetaMask y usa Hardhat Local (31337).',
     demoHint: 'Demo local: Operador / Estudio / Jugador usan las cuentas Hardhat 0, 1 y 5.',
   },
@@ -816,6 +824,8 @@ const ja = {
     demoOperator: 'オペレーターで入る',
     hint: 'ウォレットを接続し、プレイヤーIDを作成して入ります。',
     walletFail: 'デスクを開けません。ローカルノードは起動していますか？',
+    ipDeniedTitle: '入場できません',
+    ipDeniedOk: 'OK',
   },
   login: {
     title: 'ログイン',
@@ -832,6 +842,8 @@ const ja = {
     enter: 'Hub に入る',
     entering: '入場中…',
     hubWait: 'Hub 接続を待っています…',
+    ipDenied:
+      'この IP アドレスでは入場できません。管理者に連絡してください。',
     walletFail: '接続できません。MetaMask を入れ、Hardhat Local (31337) を選んでください。',
     demoHint: 'ローカルデモ: Operator / Studio / Player は Hardhat アカウント 0 / 1 / 5 です。',
   },

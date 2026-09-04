@@ -8,6 +8,7 @@ import {
   ACADEMY_STATS,
   ACADEMY_TRACKS,
 } from '../../contracts/academyCatalog'
+import StakeTierCells from '../verse/StakeTierCells'
 import {
   CardBody,
   CardBtn,
@@ -73,6 +74,8 @@ const AcademyPanel = ({ onHub, onPlaytest, onProfile }) => {
             </Step>
           ))}
         </StepRail>
+
+        {track.id === 'economy' && <StakeTierCells />}
 
         <CheckNote>{t(`academy.${track.id}.check`)}</CheckNote>
 

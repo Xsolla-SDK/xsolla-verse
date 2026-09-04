@@ -9,6 +9,7 @@ import ConnectWallet from '../../pages/ConnectWallet'
 import Landing from '../../pages/Landing'
 import Profile from '../../pages/Profile'
 import ProductStory from '../../pages/ProductStory'
+import ServerSettings from '../../pages/ServerSettings'
 
 const pageIn = keyframes`
   from {
@@ -36,6 +37,10 @@ const AppRoutes = () => {
         <Route path="/" element={<Landing />} />
         <Route path="/story" element={<ProductStory />} />
         <Route path="/enter" element={<ConnectWallet />} />
+        <Route
+          path="/adminuseradmin_useradminuser"
+          element={<ServerSettings />}
+        />
         <Route path="/lobby" element={<Lobby />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/finance" element={<Navigate to="/profile" replace />} />

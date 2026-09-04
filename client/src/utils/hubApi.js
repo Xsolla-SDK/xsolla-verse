@@ -1,3 +1,5 @@
+import { apiUrl } from './apiBase'
+
 function qs(params) {
   const search = new URLSearchParams()
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -9,7 +11,7 @@ function qs(params) {
 }
 
 async function hubRequest(path, options = {}) {
-  const res = await fetch(`/api/hub${path}`, {
+  const res = await fetch(apiUrl(`/api/hub${path}`), {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     ...options,
   })

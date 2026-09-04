@@ -25,6 +25,7 @@ import {
 } from '../../components/verse/RoleIcons'
 import xsollaLogo from '../../assets/img/xsolla-logo.svg'
 import universeBg from '../../assets/img/xsolla-universe-landing.webp'
+import { fetchServerSettings } from '../../utils/settingsApi'
 
 const DESKS = [
   { id: 'player', tone: 'cyan', Icon: PlayerIcon, blurb: 'landing.deskPlayer' },
@@ -47,7 +48,7 @@ const shortAddr = (addr) =>
 const ConnectWallet = () => {
   const { setWalletAddress, setUserName } = useContext(globalContext)
   const { t } = useContext(locaContext)
-  const { socket, socketId } = useContext(socketContext)
+  const { socket, socketId, connectError } = useContext(socketContext)
   const navigate = useNavigate()
   const location = useLocation()
   const [address, setAddress] = useState('')
@@ -56,6 +57,30 @@ const ConnectWallet = () => {
   const [busy, setBusy] = useState(false)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
+  const [ipAllowed, setIpAllowed] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchServerSettings()
+      .then((s) => {
+        if (cancelled) return
+        setIpAllowed(s.ipAllowed !== false)
+        if (s.ipAllowed === false) {
+          setError(t('login.ipDenied'))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [t])
+
+  useEffect(() => {
+    if (connectError && /not allowed to enter/i.test(connectError)) {
+      setIpAllowed(false)
+      setError(t('login.ipDenied'))
+    }
+  }, [connectError, t])
 
   useEffect(() => {
     const query = new URLSearchParams(location.search)
@@ -103,7 +128,7 @@ const ConnectWallet = () => {
 
   const onConnect = async () => {
     setBusy(true)
-    setError('')
+    if (ipAllowed) setError('')
     try {
       clearDemoPersona()
       const result = await connectMetamask()
@@ -120,6 +145,10 @@ const ConnectWallet = () => {
   }
 
   const onDemoDesk = (id) => {
+    if (!ipAllowed) {
+      setError(t('login.ipDenied'))
+      return
+    }
     const persona = setDemoPersona(id)
     if (!persona) {
       setError(t('landing.walletFail'))
@@ -129,7 +158,21 @@ const ConnectWallet = () => {
     applyWallet(persona.address, persona.username)
   }
 
-  const enterHub = (walletAddress, username, { guest = false } = {}) => {
+  const enterHub = async (walletAddress, username, { guest = false } = {}) => {
+    if (!ipAllowed) {
+      setError(t('login.ipDenied'))
+      return
+    }
+    try {
+      const s = await fetchServerSettings()
+      if (s.ipAllowed === false) {
+        setIpAllowed(false)
+        setError(t('login.ipDenied'))
+        return
+      }
+    } catch (_err) {
+      // Hub IP check is enforced on the socket; continue if settings is down.
+    }
     // Interview Bug 2 (plant): change `!== true` to `=== true` so Enter Hub never proceeds.
     if (!socket || socket.connected !== true) {
       setError(t('login.hubWait'))
@@ -163,6 +206,10 @@ const ConnectWallet = () => {
   }
 
   const onGuest = () => {
+    if (!ipAllowed) {
+      setError(t('login.ipDenied'))
+      return
+    }
     clearDemoPersona()
     enterHub(guestWallet(), 'Guest', { guest: true })
   }
@@ -176,8 +223,11 @@ const ConnectWallet = () => {
   }
 
   const hubReady = Boolean(socket && socket.connected && socketId)
-  const canEnter = Boolean(address && isValidPlayerId(playerId) && hubReady && !busy)
+  const canEnter = Boolean(
+    ipAllowed && address && isValidPlayerId(playerId) && hubReady && !busy,
+  )
   const activeDesk = DESKS.find((desk) => {
+    if (desk.id === 'guest') return false
     const persona = describePersona(desk.id)
     return (
       persona &&
@@ -258,7 +308,7 @@ const ConnectWallet = () => {
               $tone={desk.tone}
               $active={activeDesk === desk}
               onClick={() => onPickDesk(desk.id)}
-              disabled={busy || joining}
+              disabled={busy || joining || !ipAllowed}
             >
               <DeskGlow aria-hidden="true" />
               <DeskIconWrap $tone={desk.tone}>

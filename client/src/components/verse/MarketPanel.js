@@ -29,6 +29,7 @@ import {
   VerseSection,
 } from './verseUi'
 import { showVerseAlert } from '../../utils/verseAlert'
+import { chainOfflineCopy } from '../../utils/chainConfig'
 
 const MarketPanel = ({
   ownedItems,
@@ -131,7 +132,7 @@ const MarketPanel = ({
       <Meta>
         Market fee 2.5% (2% with Bronze+ stake). License holders 1%.
       </Meta>
-      {!deployed && <Meta>{t('market.deploy')}</Meta>}
+      {!deployed && <Meta>{chainOfflineCopy()}</Meta>}
       {isGuest && <Meta>{t('guest.market')}</Meta>}
 
       <SubTitle>{t('market.open')}</SubTitle>

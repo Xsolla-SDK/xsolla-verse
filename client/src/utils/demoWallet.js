@@ -1,22 +1,37 @@
 import { ethers } from 'ethers'
+import { chainRpcUrl } from './chainConfig'
 
-// Hardhat's well-known local mnemonic. Used only for localhost demo desks.
+// Hardhat default mnemonic: 12 words (11× test + junk).
 const HARDHAT_MNEMONIC =
   'test test test test test test test test test test test junk'
 
 const SESSION_KEY = 'gsv-demo-persona'
-const LOCAL_RPC = import.meta.env.VITE_RPC_URL || 'http://127.0.0.1:8545'
 
 export const DEMO_PERSONAS = {
-  operator: { id: 'operator', index: 0, username: 'Operator' },
-  studio: { id: 'studio', index: 1, username: 'Studio' },
-  player: { id: 'player', index: 5, username: 'Player' },
+  operator: {
+    id: 'operator',
+    index: 0,
+    username: 'Operator',
+    address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+  },
+  studio: {
+    id: 'studio',
+    index: 1,
+    username: 'Studio',
+    address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+  },
+  player: {
+    id: 'player',
+    index: 5,
+    username: 'Player',
+    address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
+  },
 }
 
 export function walletForIndex(index) {
   return ethers.HDNodeWallet.fromPhrase(
     HARDHAT_MNEMONIC,
-    undefined,
+    '',
     `m/44'/60'/0'/0/${index}`,
   )
 }
@@ -24,10 +39,7 @@ export function walletForIndex(index) {
 export function describePersona(id) {
   const spec = DEMO_PERSONAS[id]
   if (!spec) return null
-  return {
-    ...spec,
-    address: walletForIndex(spec.index).address,
-  }
+  return { ...spec }
 }
 
 export function setDemoPersona(id) {
@@ -51,6 +63,8 @@ export function getDemoPersonaId() {
 export async function getDemoSigner() {
   const spec = DEMO_PERSONAS[getDemoPersonaId()]
   if (!spec) return null
-  const provider = new ethers.JsonRpcProvider(LOCAL_RPC)
+  const rpc = chainRpcUrl()
+  if (!rpc) return null
+  const provider = new ethers.JsonRpcProvider(rpc)
   return walletForIndex(spec.index).connect(provider)
 }

@@ -16,6 +16,7 @@ import {
 } from '../contracts/xsolla'
 import { groupListingsByGame } from '../contracts/shopCatalog'
 import { shopGameByName } from '../contracts/hubCatalog'
+import { chainOfflineCopy } from '../utils/chainConfig'
 import { enrichItem, splitLabel, playerPerks, grantsInTitle } from '../contracts/itemEcosystem'
 import {
   ONLINE_GAMES,
@@ -418,11 +419,8 @@ const Lobby = () => {
         {mainTab === 'shop' && (
           <AnimatedPanel key="main-shop">
           <SectionBlock>
-            {!addresses.XsollaShop && (
-              <Hint>
-                On-chain shop not deployed. Browse titles below, then run{' '}
-                <code>npm run deploy:local</code> to buy with XSOLLA.
-              </Hint>
+            {!contractsConfigured() && (
+              <Hint>{chainOfflineCopy()}</Hint>
             )}
             {ownedItems.length > 0 && (
               <Hint>
@@ -444,7 +442,7 @@ const Lobby = () => {
             {!selectedShopGame &&
               (shopGames.length === 0 ? (
                 <Hint>
-                  No shop listings yet. Redeploy with npm run deploy:local
+                  {chainOfflineCopy()}
                 </Hint>
               ) : (
                 <AnimatedPanel key="shop-games">
@@ -491,10 +489,7 @@ const Lobby = () => {
                     <AnimatedPanel key={`shop-${selectedShopGame}`}>
                       {(activeShopGame ? activeShopGame.items : []).length ===
                       0 ? (
-                        <Hint>
-                          No on-chain items for this game yet. Run{' '}
-                          <code>npm run deploy:local</code> to list packs.
-                        </Hint>
+                        <Hint>{chainOfflineCopy()}</Hint>
                       ) : (
                       <Grid>
                         {(activeShopGame ? activeShopGame.items : []).map(

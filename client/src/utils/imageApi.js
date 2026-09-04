@@ -1,10 +1,12 @@
+import { apiUrl } from './apiBase'
+
 export function imageServiceUrl(filename) {
   if (!filename) return null
-  return `/api/images/${encodeURIComponent(filename)}`
+  return apiUrl(`/api/images/${encodeURIComponent(filename)}`)
 }
 
 export async function listImages() {
-  const res = await fetch('/api/images')
+  const res = await fetch(apiUrl('/api/images'))
   if (!res.ok) {
     throw new Error(`Image list failed (${res.status})`)
   }

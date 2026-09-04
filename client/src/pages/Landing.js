@@ -6,6 +6,8 @@ import xsollaLogo from '../assets/img/xsolla-logo.svg';
 import universeBg from '../assets/img/xsolla-universe-landing.webp';
 import { fetchLandingBackdropUrl } from '../utils/imageApi';
 import locaContext from '../context/localization/locaContext';
+import socketContext from '../context/websocket/socketContext';
+import { fetchServerSettings } from '../utils/settingsApi';
 import ChakraRegular from '../assets/fonts/ChakraPetch-Regular.ttf';
 import ChakraSemiBold from '../assets/fonts/ChakraPetch-SemiBold.ttf';
 import ChakraBold from '../assets/fonts/ChakraPetch-Bold.ttf';
@@ -41,18 +43,46 @@ const Landing = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useContext(locaContext);
+  const { connectError } = useContext(socketContext) || {};
   const [entering, setEntering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [backdropSrc, setBackdropSrc] = useState(universeBg);
+  const [ipAllowed, setIpAllowed] = useState(true);
+  const [ipChecked, setIpChecked] = useState(false);
+  const [showIpModal, setShowIpModal] = useState(false);
   const rafRef = useRef(null);
   const enterQueryRef = useRef(location.search || '');
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('walletAddress')) {
-      navigate(`/enter${location.search}`, { replace: true });
+    let cancelled = false;
+    fetchServerSettings()
+      .then((s) => {
+        if (cancelled) return;
+        const allowed = s.ipAllowed !== false;
+        setIpAllowed(allowed);
+        if (!allowed) setShowIpModal(true);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIpChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (connectError && /not allowed to enter/i.test(connectError)) {
+      setIpAllowed(false);
+      setShowIpModal(true);
     }
-  }, [location.search, navigate]);
+  }, [connectError]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (!params.get('walletAddress') || !ipChecked || !ipAllowed) return;
+    navigate(`/enter${location.search}`, { replace: true });
+  }, [location.search, navigate, ipChecked, ipAllowed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +123,10 @@ const Landing = () => {
 
   const startEnter = () => {
     if (entering) return;
+    if (!ipAllowed) {
+      setShowIpModal(true);
+      return;
+    }
     enterQueryRef.current = location.search || '';
     setEntering(true);
   };
@@ -152,6 +186,30 @@ const Landing = () => {
           <ProgressLabel>{progress}%</ProgressLabel>
         </LoaderPanel>
       )}
+
+      {showIpModal ? (
+        <IpModalBackdrop
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowIpModal(false);
+          }}
+        >
+          <IpModal
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ip-denied-title"
+            aria-describedby="ip-denied-copy"
+          >
+            <IpModalTitle id="ip-denied-title">
+              {t('landing.ipDeniedTitle')}
+            </IpModalTitle>
+            <IpModalCopy id="ip-denied-copy">{t('login.ipDenied')}</IpModalCopy>
+            <IpModalOk type="button" onClick={() => setShowIpModal(false)}>
+              {t('landing.ipDeniedOk')}
+            </IpModalOk>
+          </IpModal>
+        </IpModalBackdrop>
+      ) : null}
     </Page>
   );
 };
@@ -622,6 +680,61 @@ const ProgressLabel = styled.p`
   letter-spacing: 0.12em;
   color: rgba(128, 234, 255, 0.95);
   text-shadow: 0 0 10px rgba(0, 255, 255, 0.35);
+`;
+
+const IpModalBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(4, 1, 14, 0.72);
+`;
+
+const IpModal = styled.div`
+  width: min(420px, 100%);
+  padding: 1.6rem 1.4rem 1.45rem;
+  border: 1px solid rgba(128, 234, 255, 0.32);
+  background: linear-gradient(
+    180deg,
+    rgba(28, 10, 52, 0.96) 0%,
+    rgba(8, 4, 24, 0.98) 100%
+  );
+  box-shadow:
+    0 0 40px rgba(255, 110, 199, 0.16),
+    0 0 80px rgba(128, 234, 255, 0.1);
+  animation: ${fadeUp} 0.35s ease-out both;
+  text-align: center;
+`;
+
+const IpModalTitle = styled.h2`
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f4f0ff;
+`;
+
+const IpModalCopy = styled.p`
+  margin: 0 0 1.25rem;
+  color: rgba(220, 210, 245, 0.82);
+  font-size: 0.95rem;
+  line-height: 1.5;
+`;
+
+const IpModalOk = styled.button`
+  appearance: none;
+  min-width: 8rem;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid rgba(128, 234, 255, 0.7);
+  background: linear-gradient(180deg, #1aa890 0%, #0b3d38 100%);
+  color: #e8f0ee;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
 `;
 
 export default Landing;

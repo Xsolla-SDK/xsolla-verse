@@ -32,12 +32,15 @@ import {
   SC_XSOLLA_BANKROLL,
 } from '../game/actions'
 import { showVerseAlert } from '../utils/verseAlert'
+import { chainOfflineCopy } from '../utils/chainConfig'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
 import universeBg from '../assets/img/xsolla-universe-landing.webp'
 import xsollaLogo from '../assets/img/xsolla-logo.svg'
 import CoinIcon from '../components/icons/CoinIcon'
+import StakeMedalIcon from '../components/icons/StakeMedalIcon'
+import StakeTierCells from '../components/verse/StakeTierCells'
 import FeePoolCard from '../components/verse/FeePoolCard'
-import { STAKE_TIERS, stakeTierFromAmount } from '../contracts/stakeTiers'
+import { stakeTierFromAmount } from '../contracts/stakeTiers'
 import { playerPerks } from '../contracts/itemEcosystem'
 import verseContext from '../context/verse/verseContext'
 import { isGuestWallet } from '../utils/walletRole'
@@ -319,37 +322,27 @@ const Profile = () => {
               ? ` Unstake delay ${delaySec}s in demo (14 days in production).`
               : ''}
           </PanelSub>
-          {currentTier ? (
-            <Hint>
-              Current tier: {currentTier.name} ({stakedAmt.toFixed(2)} XSOLLA)
-            </Hint>
-          ) : (
-            <Hint>Stake 100 XSOLLA for Bronze perks.</Hint>
-          )}
-          <TierGrid>
-            {STAKE_TIERS.map((tier) => {
-              const active = currentTier && currentTier.id === tier.id
-              const reached = currentTier && currentTier.id >= tier.id
-              return (
-                <TierCard key={tier.id} $active={active}>
-                  <MetaLabel>{tier.name}</MetaLabel>
-                  <MetaValue>{tier.min} XSOLLA</MetaValue>
-                  <PerkList>
-                    {tier.perks.map((perk) => (
-                      <li key={perk}>{perk}</li>
-                    ))}
-                  </PerkList>
-                  <GhostBtn
-                    type="button"
-                    disabled={busy || !contractsConfigured()}
-                    onClick={() => onStakeTier(tier.min)}
-                  >
-                    {reached ? 'Add stake' : `Stake ${tier.min}`}
-                  </GhostBtn>
-                </TierCard>
-              )
-            })}
-          </TierGrid>
+          <MedalStatus>
+            <StakeMedalIcon
+              tone={currentTier ? currentTier.tone : 'bronze'}
+              size={56}
+            />
+            {currentTier ? (
+              <Hint $tone={currentTier.tone}>
+                Current medal: {currentTier.name} ({stakedAmt.toFixed(2)} XSOLLA)
+              </Hint>
+            ) : (
+              <Hint>Stake 100 XSOLLA for the Bronze medal.</Hint>
+            )}
+          </MedalStatus>
+          <StakeTierCells
+            currentId={currentTier ? currentTier.id : 0}
+            onSelect={
+              busy || !contractsConfigured()
+                ? undefined
+                : (tier) => onStakeTier(tier.min)
+            }
+          />
           {pendingUnstake > 0 && (
             <UnstakeBar>
               <Hint>
@@ -387,10 +380,7 @@ const Profile = () => {
           </PanelSub>
 
           {!contractsConfigured() ? (
-            <Hint>
-              Contracts not deployed yet. Run <code>npx hardhat node</code> and{' '}
-              <code>npm run deploy:local</code>
-            </Hint>
+            <Hint>{chainOfflineCopy()}</Hint>
           ) : (
             <>
               <Hint>
@@ -724,13 +714,27 @@ const PanelSub = styled.p`
 
 const Hint = styled.p`
   margin: 0.35rem 0;
-  color: var(--muted);
+  color: ${(p) =>
+    p.$tone === 'bronze'
+      ? '#f0c08a'
+      : p.$tone === 'silver'
+        ? '#d5e0ec'
+        : p.$tone === 'gold'
+          ? '#ffe9a8'
+          : 'var(--muted)'};
   font-size: 0.9rem;
 
   code {
     color: var(--cyan);
     font-size: 0.85em;
   }
+`
+
+const MedalStatus = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.35rem 0 0.15rem;
 `
 
 const BalanceGrid = styled.div`
@@ -744,30 +748,6 @@ const BalanceItem = styled.div`
   padding: 0.55rem 0.65rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-`
-
-const TierGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.65rem;
-  margin: 0.85rem 0 0.35rem;
-`
-
-const TierCard = styled.div`
-  padding: 0.75rem 0.8rem 0.9rem;
-  border: 1px solid
-    ${(p) =>
-      p.$active ? 'rgba(128, 234, 255, 0.7)' : 'rgba(255, 255, 255, 0.08)'};
-  background: ${(p) =>
-    p.$active ? 'rgba(128, 234, 255, 0.1)' : 'rgba(255, 255, 255, 0.03)'};
-`
-
-const PerkList = styled.ul`
-  margin: 0.45rem 0 0.7rem;
-  padding-left: 1.1rem;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
 `
 
 const UnstakeBar = styled.div`

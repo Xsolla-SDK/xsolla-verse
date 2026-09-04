@@ -16,12 +16,16 @@ const WebSocketProvider = ({ children }) => {
 
   const [socket, setSocket] = useState(null)
   const [socketId, setSocketId] = useState(null)
+  const [connectError, setConnectError] = useState('')
 
   useEffect(() => {
     const next = io(config.socketURI || undefined, {
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      transports: import.meta.env.PROD
+        ? ['polling', 'websocket']
+        : ['websocket', 'polling'],
       upgrade: true,
+      withCredentials: false,
       reconnection: true,
       reconnectionAttempts: 8,
       reconnectionDelay: 500,
@@ -34,10 +38,19 @@ const WebSocketProvider = ({ children }) => {
       window.socket = next
       setSocket(next)
       setSocketId(next.id)
+      setConnectError('')
     }
 
     const onDisconnect = () => {
       setSocketId(null)
+    }
+
+    const onConnectError = (err) => {
+      const msg = (err && err.message) || 'Hub connection failed'
+      setConnectError(msg)
+      if (/not allowed to enter/i.test(msg) && next.io) {
+        next.io.reconnection(false)
+      }
     }
 
     const onLobbyInfo = (payload = {}) => {
@@ -64,6 +77,7 @@ const WebSocketProvider = ({ children }) => {
 
     next.on('connect', onConnect)
     next.on('disconnect', onDisconnect)
+    next.on('connect_error', onConnectError)
     next.on(SC_RECEIVE_LOBBY_INFO, onLobbyInfo)
     next.on(SC_PLAYERS_UPDATED, onPlayersUpdated)
     next.on(SC_TABLES_UPDATED, onTablesUpdated)
@@ -74,6 +88,7 @@ const WebSocketProvider = ({ children }) => {
       window.removeEventListener('beforeunload', onUnload)
       next.off('connect', onConnect)
       next.off('disconnect', onDisconnect)
+      next.off('connect_error', onConnectError)
       next.off(SC_RECEIVE_LOBBY_INFO, onLobbyInfo)
       next.off(SC_PLAYERS_UPDATED, onPlayersUpdated)
       next.off(SC_TABLES_UPDATED, onTablesUpdated)
@@ -108,7 +123,7 @@ const WebSocketProvider = ({ children }) => {
   }
 
   return (
-    <SocketContext.Provider value={{ socket, socketId, cleanUp }}>
+    <SocketContext.Provider value={{ socket, socketId, cleanUp, connectError }}>
       {children}
     </SocketContext.Provider>
   )
