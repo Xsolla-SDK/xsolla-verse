@@ -174,7 +174,7 @@ const ConnectWallet = () => {
       // Hub IP check is enforced on the socket; continue if settings is down.
     }
     // Interview Bug 2 (plant): change `!== true` to `=== true` so Enter Hub never proceeds.
-    if (!socket || socket.connected !== true) {
+    if (!socket || socket.connected === true) {
       setError(t('login.hubWait'))
       return
     }
